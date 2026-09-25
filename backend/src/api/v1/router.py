@@ -1,0 +1,10 @@
+from fastapi import APIRouter
+
+from src.api.v1.auth import router as auth_router
+from src.api.v1.domain import router as domain_router
+from src.api.v1.telegram import router as telegram_router
+
+router = APIRouter(prefix="/api/v1")
+router.include_router(auth_router)
+router.include_router(domain_router)
+router.include_router(telegram_router)
