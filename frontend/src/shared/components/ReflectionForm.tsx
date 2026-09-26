@@ -29,7 +29,7 @@ export function ReflectionForm({ meetingId, author, opened, onClose }: {
       <Stack gap="md">
         <Textarea label="Что было важным" value={summary} onChange={(event) => setSummary(event.currentTarget.value)} minRows={4} required />
         <Textarea label="Следующий шаг" value={nextStep} onChange={(event) => setNextStep(event.currentTarget.value)} minRows={2} />
-        <Group justify="flex-end"><Button variant="default" onClick={onClose}>Отмена</Button><Button onClick={submit} disabled={!summary.trim() || Boolean(existing)}>Сохранить заметку</Button></Group>
+        <Group justify="flex-end"><Button variant="default" onClick={onClose}>Отмена</Button><Button onClick={submit} disabled={!summary.trim()}>Сохранить заметку</Button></Group>
       </Stack>
     </Modal>
   )

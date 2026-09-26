@@ -1,11 +1,11 @@
 import { Notification } from '@mantine/core'
-import { IconCheck } from '@tabler/icons-react'
+import { IconAlertCircle, IconCheck } from '@tabler/icons-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect } from 'react'
 import { usePlatformState } from '../../features/platform/usePlatformState'
 
 export function AppNotice() {
-  const { notice, dismissNotice } = usePlatformState()
+  const { notice, noticeIsError, dismissNotice } = usePlatformState()
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export function AppNotice() {
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
           transition={{ type: 'spring', bounce: 0, duration: 0.32 }}
         >
-          <Notification icon={<IconCheck size={18} />} color="teal" title="Готово" onClose={dismissNotice} withBorder>
+          <Notification icon={noticeIsError ? <IconAlertCircle size={18} /> : <IconCheck size={18} />} color={noticeIsError ? 'red' : 'teal'} title={noticeIsError ? 'Проверьте данные' : 'Готово'} onClose={dismissNotice} withBorder>
             {notice}
           </Notification>
         </motion.div>

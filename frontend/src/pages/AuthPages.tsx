@@ -12,7 +12,7 @@ function AuthBrand() {
 export function Login() {
   const navigate = useNavigate()
   const { login } = usePlatformState()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState('oleg@example.ru')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -33,12 +33,13 @@ export function Login() {
 
   return <div className="auth-page"><form className="auth-panel" onSubmit={submit}>
     <AuthBrand />
-    <div><Title order={1} ta="center">Рады видеть снова</Title><Text c="dimmed" ta="center" mt={8}>Войдите в пространство профессионального роста</Text></div>
+    <div><Title order={1} ta="center">Рады видеть снова</Title><Text c="dimmed" ta="center" mt={8}>Демо лабораторной №1 — без подключения к серверу</Text></div>
     <Stack gap="md">
       {error && <Alert color="red">{error}</Alert>}
       <TextInput type="email" required label="Email" placeholder="oleg@example.ru" leftSection={<IconMail size={18} />} value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
       <PasswordInput required label="Пароль" value={password} onChange={(event) => setPassword(event.currentTarget.value)} />
       <Button type="submit" size="md" loading={busy} rightSection={<IconArrowRight size={18} />}>Войти</Button>
+      <Button type="button" variant="default" onClick={async () => { await login({ email: 'oleg@example.ru', password: 'demo-password' }); navigate('/student/dashboard') }}>Войти в демо</Button>
     </Stack>
     <Text ta="center" size="sm" c="dimmed">Нет аккаунта? <Anchor component={Link} to="/register">Зарегистрироваться</Anchor></Text>
   </form></div>
@@ -70,7 +71,7 @@ export function Register() {
 
   return <div className="auth-page"><form className="auth-panel wide" onSubmit={submit}>
     <AuthBrand />
-    <div><Title order={1} ta="center">Создайте аккаунт</Title><Text c="dimmed" ta="center" mt={8}>Начните с одной роли — вторую можно добавить позже</Text></div>
+    <div><Title order={1} ta="center">Создайте аккаунт</Title><Text c="dimmed" ta="center" mt={8}>Демо-регистрация: данные остаются в браузере, обе роли доступны сразу</Text></div>
     <Stack gap="md">
       {error && <Alert color="red">{error}</Alert>}
       <TextInput required label="Имя" value={name} onChange={(event) => setName(event.currentTarget.value)} />

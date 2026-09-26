@@ -5,7 +5,7 @@ import {
   IconLogout, IconNotes, IconSettings, IconUser, IconUsers, IconUserSearch,
 } from '@tabler/icons-react'
 import type { TablerIcon } from '@tabler/icons-react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AppNotice } from '../../shared/components/AppNotice'
@@ -25,7 +25,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
       ? { label: 'Мой ментор', path: '/student/my-mentor', icon: IconUser }
       : { label: 'Наставники', path: '/student/mentors', icon: IconUserSearch },
     { label: 'Встречи', path: '/student/meetings', icon: IconCalendarEvent },
-    ...(scenario === 'active' ? [{ label: 'Заметки', path: '/student/notes', icon: IconNotes }] : []),
+    { label: 'Заметки', path: '/student/notes', icon: IconNotes },
     { label: 'Уведомления', path: '/notifications', icon: IconBell },
   ]
   const mentorItems: NavItem[] = [
@@ -75,7 +75,7 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function RoleSwitch({ compact = false }: { compact?: boolean }) {
+function RoleSwitch({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const { mode, setMode, roles } = usePlatformState()
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
@@ -95,6 +95,7 @@ function RoleSwitch({ compact = false }: { compact?: boolean }) {
             onClick={() => {
               setMode(option.value)
               navigate(`/${option.value}/dashboard`)
+              onNavigate?.()
             }}
           >
             {mode === option.value && (
@@ -118,7 +119,7 @@ function SidebarContent({ onNavigate, showBrand = true, showRoleSwitch = true }:
   return (
     <Stack h="100%" gap="xl">
       {showBrand && <Brand />}
-      {showRoleSwitch && <RoleSwitch />}
+      {showRoleSwitch && <RoleSwitch onNavigate={onNavigate} />}
       <Box style={{ flex: 1 }}><Navigation onNavigate={onNavigate} /></Box>
       <div>
         <Divider mb="md" />
@@ -191,18 +192,15 @@ export function AppLayout() {
             <div className="user-avatar compact">{user.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div>
           </Group>
         </header>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={location.pathname}
-            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-            transition={reduceMotion ? { duration: 0.12 } : { type: 'spring', bounce: 0, duration: 0.34 }}
-            className="page-container"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={location.pathname}
+          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0.12 } : { type: 'spring', bounce: 0, duration: 0.34 }}
+          className="page-container"
+        >
+          <Outlet />
+        </motion.div>
       </main>
       <AppNotice />
     </div>

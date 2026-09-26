@@ -6,6 +6,7 @@ export type MeetingAudience = 'student' | 'mentor'
 
 export interface TimeSlot {
   id: string
+  startsAt: string
   dateLabel: string
   date: string
   time: string

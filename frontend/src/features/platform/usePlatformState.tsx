@@ -1,357 +1,250 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { api, authenticate, clearSession, hasSession } from '../../shared/api/client'
-import { userSchema, type ApiAssignment, type ApiMeeting, type ApiMentor, type ApiNotification, type ApiReflection, type ApiSlot, type ApiStudentProfile, type ApiUser } from '../../entities/apiTypes'
-import type { AppMode, AppNotification, AvailabilitySlot, Meeting, MeetingAudience, MeetingStatus, Mentor, MentorAssignment, ProfileDraft, Reflection, Student, StudentScenario, TimeSlot } from '../../shared/types'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createDemoState, dateLabel, demoUserId, makeSlot, type DemoState } from './demoData'
+import type { AppMode, AppNotification, MeetingAudience, MeetingStatus, Mentor, ProfileDraft, StudentScenario, TimeSlot } from '../../shared/types'
 
-type SlotInput = { date: string; time: string; duration: 60 | 75 | 90 }
+const storageKey = 'mentoring-lab-01-v1'
+const demoRoles: AppMode[] = ['student', 'mentor']
 type Credentials = { email: string; password: string }
 type Registration = Credentials & { name: string; initial_role: AppMode }
 
-interface PlatformState {
-  user: ApiUser | null
-  loggedIn: boolean
-  loading: boolean
+function loadState(): DemoState {
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey) ?? 'null') as DemoState | null
+    if (value && typeof value.loggedIn === 'boolean' && ['student', 'mentor'].includes(value.mode)
+      && typeof value.profile?.firstName === 'string'
+      && ['mentors', 'students', 'meetings', 'assignments', 'availability', 'notifications', 'reflections']
+        .every((key) => Array.isArray(value[key as keyof DemoState]))) return value
+  } catch {
+    // Invalid or unavailable local storage falls back to the initial demo.
+  }
+  return createDemoState()
+}
+
+function notification(title: string, description: string, kind: AppNotification['kind']): AppNotification {
+  return { id: crypto.randomUUID(), title, description, kind, read: false, time: 'Только что' }
+}
+
+function validateCredentials({ email, password }: Credentials) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Укажите корректный email')
+  if (password.length < 8) throw new Error('Пароль должен содержать не менее 8 символов')
+}
+
+export function PlatformProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<DemoState>(loadState)
+  const [notice, setNoticeValue] = useState<string | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
+  const setNotice = useCallback((message: string | null, isError = false) => {
+    setNoticeValue(message)
+    setNoticeIsError(isError)
+  }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(state)) } catch {
+      setNotice('Браузер не разрешил сохранение. Изменения останутся только до перезагрузки.', true)
+    }
+  }, [state, setNotice])
+
+  const assignment = state.assignments.find((item) => item.status === 'active') ?? null
+  const scenario: StudentScenario = assignment ? 'active'
+    : state.assignments.at(-1)?.endReason === 'mentor_departed' ? 'departed' : 'none'
+  const currentMentor = state.mentors.find((mentor) => mentor.id === assignment?.mentorId) ?? null
+  const claimedSlotIds = state.meetings.filter((meeting) => ['pending', 'confirmed'].includes(meeting.status))
+    .flatMap((meeting) => meeting.slotId ? [meeting.slotId] : [])
+  const user = {
+    id: demoUserId, name: `${state.profile.firstName} ${state.profile.lastName}`.trim(),
+    email: state.profile.email, roles: demoRoles,
+  }
+  const fail = (message: string) => { setNotice(message, true); return false }
+
+  const setScenario = (next: StudentScenario) => {
+    setState((current) => {
+      const active = current.assignments.find((item) => item.status === 'active')
+      const ended = current.assignments.filter((item) => item.status === 'ended')
+      if (next === 'active') return {
+        ...current, assignments: [...ended, active ?? {
+          id: crypto.randomUUID(), mentorId: current.mentors[0].id, status: 'active',
+          startDate: dateLabel(new Date().toISOString()),
+        }],
+      }
+      const assignments = [...ended, {
+        id: active?.id ?? crypto.randomUUID(), mentorId: active?.mentorId ?? current.mentors[0].id,
+        status: 'ended' as const, startDate: active?.startDate ?? 'Начало демонстрации',
+        endDate: dateLabel(new Date().toISOString()),
+        endReason: next === 'departed' ? 'mentor_departed' as const : undefined,
+      }]
+      return {
+        ...current, assignments,
+        meetings: current.meetings.map((meeting) => meeting.studentId === demoUserId
+          && ['pending', 'confirmed'].includes(meeting.status) ? { ...meeting, status: 'cancelled' } : meeting),
+      }
+    })
+    setNotice('Демонстрационный сценарий изменён')
+  }
+
+  const selectMentor = async (mentor: Mentor) => {
+    if (assignment) return fail('У вас уже есть активный наставник')
+    if (!mentor.acceptingStudents || mentor.status !== 'online') return fail('Наставник пока не принимает учеников')
+    setState((current) => ({
+      ...current,
+      assignments: [...current.assignments, { id: crypto.randomUUID(), mentorId: mentor.id, status: 'active', startDate: dateLabel(new Date().toISOString()) }],
+      notifications: [notification('Наставник выбран', `${mentor.name} теперь ваш ментор.`, 'meeting'), ...current.notifications],
+    }))
+    setNotice('Наставник выбран')
+    return true
+  }
+
+  const requestMeeting = async (mentor: Mentor, slot: TimeSlot) => {
+    if (assignment?.mentorId !== mentor.id) return fail('Встречи доступны только с вашим наставником')
+    if (!mentor.availableSlots.some((item) => item.id === slot.id) || claimedSlotIds.includes(slot.id)) return fail('Слот уже занят')
+    const starts = new Date(slot.startsAt)
+    if (starts <= new Date()) return fail('Это свободное время уже прошло')
+    const weekStart = new Date(starts)
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 6) % 7)
+    weekStart.setHours(0, 0, 0, 0)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 7)
+    const count = state.meetings.filter((meeting) => meeting.studentId === demoUserId
+      && meeting.mentorId === mentor.id && meeting.status !== 'cancelled'
+      && new Date(meeting.startsAt) >= weekStart && new Date(meeting.startsAt) < weekEnd).length
+    if (count >= 2) return fail('Не более двух встреч с наставником в неделю')
+    setState((current) => ({
+      ...current,
+      meetings: [{
+        id: crypto.randomUUID(), startsAt: slot.startsAt, title: 'Встреча с наставником',
+        mentorId: mentor.id, studentId: demoUserId, mentorName: mentor.name, studentName: user.name,
+        date: slot.date, time: slot.time, duration: slot.duration, status: 'pending', slotId: slot.id,
+      }, ...current.meetings],
+      notifications: [notification('Заявка отправлена', `${slot.date}, ${slot.time} · ожидает подтверждения.`, 'meeting'), ...current.notifications],
+    }))
+    setNotice('Заявка на встречу отправлена')
+    return true
+  }
+
+  const changeMeeting = async (id: string, status: MeetingStatus, audience: MeetingAudience) => {
+    const meeting = state.meetings.find((item) => item.id === id)
+    if (!meeting || (audience === 'student' ? meeting.studentId : meeting.mentorId) !== demoUserId) return fail('Встреча недоступна')
+    if (status === 'confirmed' && meeting.status !== 'pending') return fail('Заявка уже обработана')
+    if (status === 'completed' && meeting.status !== 'confirmed') return fail('Встреча ещё не подтверждена')
+    if (status === 'cancelled' && !['pending', 'confirmed'].includes(meeting.status)) return fail('Встречу уже нельзя отменить')
+    setState((current) => ({
+      ...current,
+      meetings: current.meetings.map((item) => item.id === id ? {
+        ...item, status, meetingUrl: status === 'confirmed' ? current.profile.telemostUrl || 'https://telemost.yandex.ru/' : item.meetingUrl,
+      } : item),
+      availability: current.availability.map((slot) => slot.id === meeting.slotId ? {
+        ...slot, state: status === 'cancelled' ? 'free' : status === 'confirmed' ? 'booked' : slot.state,
+      } : slot),
+      notifications: [notification(status === 'confirmed' ? 'Встреча подтверждена' : status === 'completed' ? 'Встреча завершена' : 'Встреча отменена', `${meeting.title} · ${meeting.date}, ${meeting.time}.`, 'meeting'), ...current.notifications],
+    }))
+    setNotice(status === 'confirmed' ? 'Встреча подтверждена' : status === 'completed' ? 'Встреча завершена' : 'Встреча отменена')
+    return true
+  }
+
+  const addAvailability = async (input: { date: string; time: string; duration: 60 | 75 | 90 }) => {
+    const starts = new Date(`${input.date}T${input.time}`)
+    if (!Number.isFinite(starts.getTime()) || starts <= new Date()) return fail('Укажите будущие дату и время')
+    if (![60, 75, 90].includes(input.duration)) return fail('Выберите длительность 60, 75 или 90 минут')
+    if (state.availability.some((slot) => new Date(slot.startsAt).getTime() < starts.getTime() + input.duration * 60_000
+      && new Date(slot.startsAt).getTime() + slot.duration * 60_000 > starts.getTime())) return fail('Время пересекается с другим слотом')
+    setState((current) => ({
+      ...current, availability: [...current.availability, { ...makeSlot(crypto.randomUUID(), starts.toISOString(), input.duration), state: 'free' as const }]
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+    }))
+    setNotice('Свободное время добавлено')
+    return true
+  }
+
+  const removeAvailability = async (id: string) => {
+    if (state.availability.find((slot) => slot.id === id)?.state !== 'free') return fail('Занятый слот удалить нельзя')
+    setState((current) => ({ ...current, availability: current.availability.filter((slot) => slot.id !== id) }))
+    setNotice('Свободное время удалено')
+    return true
+  }
+
+  const saveReflection = async (meetingId: string, author: MeetingAudience, summary: string, nextStep?: string) => {
+    const meeting = state.meetings.find((item) => item.id === meetingId)
+    if (!summary.trim()) return fail('Напишите, что было важным на встрече')
+    if (!meeting || meeting.status !== 'completed' || (author === 'student' ? meeting.studentId : meeting.mentorId) !== demoUserId) return fail('Заметки доступны после вашей завершённой встречи')
+    setState((current) => {
+      const existing = current.reflections.find((item) => item.meetingId === meetingId && item.author === author)
+      const reflection = { id: existing?.id ?? crypto.randomUUID(), meetingId, author, date: dateLabel(new Date().toISOString()), summary: summary.trim(), nextStep: nextStep?.trim() }
+      return { ...current, reflections: existing ? current.reflections.map((item) => item.id === existing.id ? reflection : item) : [...current.reflections, reflection] }
+    })
+    setNotice('Приватная заметка сохранена')
+    return true
+  }
+
+  const saveProfile = async (profile: ProfileDraft) => {
+    if (!profile.firstName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return fail('Укажите имя и корректный email')
+    if (profile.avatarUrl && !/^https?:\/\//.test(profile.avatarUrl)) return fail('Аватар должен быть ссылкой http или https')
+    if (profile.telemostUrl && !/^https:\/\/telemost\.yandex\.ru(?:\/|$)/.test(profile.telemostUrl)) return fail('Укажите ссылку https://telemost.yandex.ru/...')
+    setState((current) => ({ ...current, profile, meetings: current.meetings.map((meeting) => ({
+      ...meeting, studentName: meeting.studentId === demoUserId ? `${profile.firstName} ${profile.lastName}`.trim() : meeting.studentName,
+      mentorName: meeting.mentorId === demoUserId ? `${profile.firstName} ${profile.lastName}`.trim() : meeting.mentorName,
+    })) }))
+    setNotice('Профиль сохранён')
+    return true
+  }
+
+  const value = {
+    ...state, user, roles: demoRoles, loading: false, scenario, assignment, currentMentor, claimedSlotIds,
+    notice, noticeIsError, unreadCount: state.notifications.filter((item) => !item.read).length,
+    setScenario,
+    setMode: (mode: AppMode) => setState((current) => current.mode === mode ? current : { ...current, mode }),
+    selectMentor, requestMeeting, addAvailability, removeAvailability, saveReflection, saveProfile,
+    cancelMeeting: (id: string) => changeMeeting(id, 'cancelled', 'student'),
+    updateMeetingStatus: (id: string, status: MeetingStatus) => changeMeeting(id, status, 'mentor'),
+    markAllNotificationsRead: async () => {
+      setState((current) => ({ ...current, notifications: current.notifications.map((item) => ({ ...item, read: true })) }))
+      setNotice('Уведомления прочитаны')
+      return true
+    },
+    login: async (credentials: Credentials) => {
+      validateCredentials(credentials)
+      setState((current) => ({ ...current, loggedIn: true }))
+    },
+    register: async (data: Registration) => {
+      validateCredentials(data)
+      if (!data.name.trim()) throw new Error('Укажите имя')
+      const [firstName, ...lastName] = data.name.trim().split(/\s+/)
+      setState((current) => ({ ...current, loggedIn: true, mode: data.initial_role,
+        profile: { ...current.profile, firstName, lastName: lastName.join(' '), email: data.email } }))
+    },
+    logout: async () => setState((current) => ({ ...current, loggedIn: false })),
+    dismissNotice: () => setNotice(null),
+  }
+  return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>
+}
+
+type PlatformState = Omit<DemoState, 'assignments'> & {
+  user: { id: string; name: string; email: string; roles: AppMode[] }
   roles: AppMode[]
-  mode: AppMode
+  loading: boolean
   scenario: StudentScenario
+  assignment: DemoState['assignments'][number] | null
   currentMentor: Mentor | null
-  assignment: MentorAssignment | null
-  mentors: Mentor[]
-  students: Student[]
-  meetings: Meeting[]
-  availability: AvailabilitySlot[]
-  notifications: AppNotification[]
-  reflections: Reflection[]
-  profile: ProfileDraft
   claimedSlotIds: string[]
   notice: string | null
+  noticeIsError: boolean
   unreadCount: number
-  telegramConnected: boolean
+  setScenario: (scenario: StudentScenario) => void
   setMode: (mode: AppMode) => void
   selectMentor: (mentor: Mentor) => Promise<boolean>
   requestMeeting: (mentor: Mentor, slot: TimeSlot) => Promise<boolean>
-  cancelMeeting: (meetingId: string) => Promise<boolean>
-  updateMeetingStatus: (meetingId: string, status: MeetingStatus) => Promise<boolean>
-  addAvailability: (slot: SlotInput) => Promise<boolean>
-  removeAvailability: (slotId: string) => Promise<boolean>
-  markAllNotificationsRead: () => Promise<boolean>
-  saveReflection: (meetingId: string, author: MeetingAudience, summary: string, nextStep?: string) => Promise<boolean>
+  cancelMeeting: (id: string) => Promise<boolean>
+  updateMeetingStatus: (id: string, status: MeetingStatus) => Promise<boolean>
+  addAvailability: (input: { date: string; time: string; duration: 60 | 75 | 90 }) => Promise<boolean>
+  removeAvailability: (id: string) => Promise<boolean>
+  saveReflection: (id: string, author: MeetingAudience, summary: string, nextStep?: string) => Promise<boolean>
   saveProfile: (profile: ProfileDraft) => Promise<boolean>
+  markAllNotificationsRead: () => Promise<boolean>
   login: (credentials: Credentials) => Promise<void>
   register: (data: Registration) => Promise<void>
   logout: () => Promise<void>
-  addRole: (role: AppMode) => Promise<boolean>
-  connectTelegram: () => Promise<boolean>
   dismissNotice: () => void
 }
 
 const PlatformContext = createContext<PlatformState | null>(null)
-const emptyProfile: ProfileDraft = {
-  avatarUrl: '',
-  firstName: '', lastName: '', email: '', timezone: 'Europe/Moscow',
-  studentAbout: '', studentLevel: '', studentDirection: '', studentGoal: '',
-  studentTechnologies: '', studentLearning: '', mentorAbout: '',
-  mentorSpecialization: 'Backend', mentorSkills: '', mentorExperience: '',
-  mentorCompany: '', mentorPosition: '', telemostUrl: '',
-}
-
-function dateParts(value: string) {
-  const date = new Date(value)
-  return {
-    dateLabel: new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(date),
-    date: new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(date),
-    time: new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date),
-  }
-}
-
-function slotView(slot: ApiSlot): TimeSlot {
-  return { id: slot.id, ...dateParts(slot.starts_at), duration: slot.duration_minutes }
-}
-
-function mentorView(profile: ApiMentor, slots: ApiSlot[]): Mentor {
-  return {
-    id: profile.user_id,
-    name: profile.name,
-    initials: profile.name.split(' ').map((part) => part[0]).slice(0, 2).join(''),
-    avatarColor: '#e6e8ff',
-    about: profile.about,
-    specialization: profile.specialization,
-    skills: profile.skills,
-    experience: profile.experience,
-    company: profile.company,
-    position: profile.position,
-    timezone: profile.timezone,
-    acceptingStudents: profile.accepting_students,
-    status: profile.status === 'active' ? 'online' : 'away',
-    availableSlots: slots.filter((item) => item.status === 'free').map(slotView),
-  }
-}
-
-function studentView(user: { id: string; name: string }, profile: ApiStudentProfile): Student {
-  return {
-    id: user.id, name: user.name,
-    initials: user.name.split(' ').map((part) => part[0]).slice(0, 2).join(''),
-    level: profile.current_level || 'Не указан',
-    direction: profile.direction || 'Направление не указано',
-    skills: profile.technologies,
-    goal: profile.learning_goal || 'Цель пока не указана',
-    about: profile.about,
-  }
-}
-
-export function PlatformProvider({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient()
-  const [loggedIn, setLoggedIn] = useState(hasSession)
-  const [mode, setSelectedMode] = useState<AppMode>(() => localStorage.getItem('platform-mode') === 'mentor' ? 'mentor' : 'student')
-  const [notice, setNotice] = useState<string | null>(null)
-
-  const meQuery = useQuery({
-    queryKey: ['me', loggedIn],
-    queryFn: async () => userSchema.parse(await api<unknown>('/auth/me')),
-    enabled: loggedIn,
-    retry: false,
-  })
-  const user = meQuery.data ?? null
-  const roles = user?.roles ?? []
-  const student = Boolean(user && roles.includes('student'))
-  const mentor = Boolean(user && roles.includes('mentor'))
-
-  const assignmentsQuery = useQuery({
-    queryKey: ['assignments', user?.id],
-    queryFn: () => api<ApiAssignment[]>('/assignments/me'),
-    enabled: student,
-  })
-  const active = assignmentsQuery.data?.find((item) => item.status === 'active')
-  const departed = assignmentsQuery.data?.some((item) => item.end_reason === 'mentor_departed')
-  const scenario: StudentScenario = active ? 'active' : departed ? 'departed' : 'none'
-  const assignment: MentorAssignment | null = active ? {
-    id: active.id, mentorId: active.mentor_id, status: active.status,
-    startDate: dateParts(active.created_at).dateLabel,
-  } : null
-
-  const catalogQuery = useQuery({
-    queryKey: ['mentors', user?.id],
-    queryFn: async () => {
-      const profiles = await api<ApiMentor[]>('/mentors')
-      return Promise.all(profiles.map(async (item) => mentorView(
-        item, await api<ApiSlot[]>(`/mentors/${item.user_id}/slots`),
-      )))
-    },
-    enabled: student && !active && assignmentsQuery.isSuccess,
-  })
-  const currentMentorQuery = useQuery({
-    queryKey: ['current-mentor', active?.mentor_id],
-    queryFn: async () => mentorView(
-      await api<ApiMentor>(`/mentors/${active!.mentor_id}`),
-      await api<ApiSlot[]>(`/mentors/${active!.mentor_id}/slots`),
-    ),
-    enabled: Boolean(active),
-  })
-  const currentMentor = currentMentorQuery.data ?? null
-  const mentors = catalogQuery.data ?? (currentMentor ? [currentMentor] : [])
-
-  const studentProfileQuery = useQuery({
-    queryKey: ['student-profile', user?.id],
-    queryFn: () => api<ApiStudentProfile>('/profiles/student/me'),
-    enabled: student,
-  })
-  const mentorProfileQuery = useQuery({
-    queryKey: ['mentor-profile', user?.id],
-    queryFn: () => api<ApiMentor>('/profiles/mentor/me'),
-    enabled: mentor,
-  })
-  const availabilityQuery = useQuery({
-    queryKey: ['availability', user?.id],
-    queryFn: () => api<ApiSlot[]>(`/mentors/${user!.id}/slots`),
-    enabled: mentor,
-  })
-  const meetingsQuery = useQuery({
-    queryKey: ['meetings', user?.id],
-    queryFn: () => api<ApiMeeting[]>('/meetings'),
-    enabled: Boolean(user),
-  })
-  const notificationsQuery = useQuery({
-    queryKey: ['notifications', user?.id],
-    queryFn: () => api<ApiNotification[]>('/notifications'),
-    enabled: Boolean(user),
-  })
-  const telegramStatusQuery = useQuery({
-    queryKey: ['telegram-status', user?.id],
-    queryFn: () => api<{ connected: boolean }>('/telegram/status'),
-    enabled: Boolean(user),
-  })
-  const studentsQuery = useQuery({
-    queryKey: ['students', user?.id],
-    queryFn: async () => {
-      const people = await api<{ id: string; name: string }[]>('/students')
-      return Promise.all(people.map(async (person) => studentView(
-        person, await api<ApiStudentProfile>(`/students/${person.id}`),
-      )))
-    },
-    enabled: mentor,
-  })
-  const students = studentsQuery.data ?? []
-  const reflectionsQuery = useQuery({
-    queryKey: ['reflections', user?.id, meetingsQuery.data?.map((item) => item.id).join(',')],
-    queryFn: async () => (await Promise.all(
-      (meetingsQuery.data ?? []).filter((item) => item.status === 'completed').map(
-        (item) => api<ApiReflection[]>(`/meetings/${item.id}/reflections`),
-      ),
-    )).flat(),
-    enabled: Boolean(user && meetingsQuery.data),
-  })
-
-  const meetings: Meeting[] = (meetingsQuery.data ?? []).map((item) => ({
-    id: item.id, startsAt: item.starts_at, title: 'Встреча с наставником', mentorId: item.mentor_id,
-    studentId: item.student_id,
-    mentorName: user?.id === item.mentor_id ? user.name : currentMentor?.name ?? 'Наставник',
-    studentName: user?.id === item.student_id ? user.name : students.find((person) => person.id === item.student_id)?.name ?? 'Ученик',
-    ...dateParts(item.starts_at), duration: item.duration_minutes, status: item.status,
-    meetingUrl: item.meeting_url ?? undefined, slotId: item.slot_id,
-  }))
-  const availability: AvailabilitySlot[] = (availabilityQuery.data ?? []).map((item) => ({
-    ...slotView(item), state: item.status,
-  }))
-  const notifications: AppNotification[] = (notificationsQuery.data ?? []).map((item) => ({
-    id: item.id, title: item.title, description: item.body,
-    time: dateParts(item.created_at).dateLabel,
-    kind: item.title.includes('заявка') ? 'request' : 'meeting',
-    read: item.is_read,
-  }))
-  const reflections: Reflection[] = (reflectionsQuery.data ?? []).map((item) => ({
-    id: item.id, meetingId: item.meeting_id, author: item.author_role,
-    date: 'После встречи', summary: item.text,
-  }))
-  const profile: ProfileDraft = useMemo(() => {
-    const [firstName = '', ...last] = user?.name.split(' ') ?? []
-    const learner = studentProfileQuery.data
-    const coach = mentorProfileQuery.data
-    return {
-      ...emptyProfile, avatarUrl: user?.avatar_url ?? '', firstName, lastName: last.join(' '), email: user?.email ?? '',
-      timezone: learner?.timezone ?? coach?.timezone ?? 'Europe/Moscow',
-      studentAbout: learner?.about ?? '', studentLevel: learner?.current_level ?? '',
-      studentDirection: learner?.direction ?? '', studentGoal: learner?.learning_goal ?? '',
-      studentTechnologies: learner?.technologies.join(', ') ?? '',
-      studentLearning: learner?.wants_to_learn ?? '',
-      mentorAbout: coach?.about ?? '', mentorSpecialization: coach?.specialization ?? 'Backend',
-      mentorSkills: coach?.skills.join(', ') ?? '', mentorExperience: coach?.experience ?? '',
-      mentorCompany: coach?.company ?? '', mentorPosition: coach?.position ?? '',
-      telemostUrl: coach?.default_meeting_url ?? '',
-    }
-  }, [user, studentProfileQuery.data, mentorProfileQuery.data])
-
-  const invalidate = async (skipCatalog = false) => {
-    await queryClient.invalidateQueries({
-      predicate: (query) => !skipCatalog || query.queryKey[0] !== 'mentors',
-    })
-  }
-  const perform = async (
-    action: () => Promise<unknown>, success: string, skipCatalog = false,
-  ): Promise<boolean> => {
-    try {
-      await action()
-      await invalidate(skipCatalog)
-      setNotice(success)
-      return true
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Не удалось выполнить действие')
-      return false
-    }
-  }
-  const setMode = (next: AppMode) => {
-    if (roles.includes(next)) {
-      setSelectedMode(next)
-      localStorage.setItem('platform-mode', next)
-    }
-  }
-
-  const value: PlatformState = {
-    user, loggedIn, loading: loggedIn && meQuery.isPending, roles, mode, scenario,
-    currentMentor, assignment, mentors, students, meetings, availability,
-    notifications, reflections, profile,
-    claimedSlotIds: (availabilityQuery.data ?? []).filter((item) => item.status !== 'free').map((item) => item.id),
-    notice, unreadCount: notifications.filter((item) => !item.read).length,
-    telegramConnected: telegramStatusQuery.data?.connected ?? false,
-    setMode,
-    selectMentor: (selected) => perform(
-      () => api(`/assignments/${selected.id}`, { method: 'POST' }), 'Наставник выбран', true,
-    ),
-    requestMeeting: (_mentor, slot) => perform(
-      () => api('/meetings', { method: 'POST', body: JSON.stringify({ slot_id: slot.id }) }),
-      'Заявка на встречу отправлена',
-    ),
-    cancelMeeting: (id) => perform(
-      () => api(`/meetings/${id}/cancel`, { method: 'POST' }), 'Встреча отменена',
-    ),
-    updateMeetingStatus: (id, status) => perform(
-      () => api(`/meetings/${id}/${status === 'confirmed' ? 'confirm' : status === 'completed' ? 'complete' : 'reject'}`, { method: 'POST' }),
-      status === 'confirmed' ? 'Встреча подтверждена' : 'Заявка обработана',
-    ),
-    addAvailability: (slot) => perform(
-      () => api('/slots', { method: 'POST', body: JSON.stringify({ starts_at: new Date(`${slot.date}T${slot.time}`).toISOString(), duration_minutes: slot.duration }) }),
-      'Свободное время добавлено',
-    ),
-    removeAvailability: (id) => perform(
-      () => api(`/slots/${id}`, { method: 'DELETE' }), 'Свободное время удалено',
-    ),
-    markAllNotificationsRead: () => perform(
-      () => api('/notifications/read-all', { method: 'POST' }), 'Уведомления прочитаны',
-    ),
-    saveReflection: (id, _author, summary, nextStep) => perform(
-      () => api(`/meetings/${id}/reflections`, { method: 'POST', body: JSON.stringify({ text: nextStep ? `${summary}\nСледующий шаг: ${nextStep}` : summary }) }),
-      'Приватная заметка сохранена',
-    ),
-    saveProfile: (updated) => perform(async () => {
-      await api('/auth/me', { method: 'PUT', body: JSON.stringify({
-        name: `${updated.firstName} ${updated.lastName}`.trim(), email: updated.email,
-        avatar_url: updated.avatarUrl || null,
-      }) })
-      if (student) await api('/profiles/student/me', { method: 'PUT', body: JSON.stringify({
-        about: updated.studentAbout, current_level: updated.studentLevel,
-        direction: updated.studentDirection, learning_goal: updated.studentGoal,
-        technologies: updated.studentTechnologies.split(',').map((value) => value.trim()).filter(Boolean),
-        wants_to_learn: updated.studentLearning, timezone: updated.timezone,
-      }) })
-      if (mentor) await api('/profiles/mentor/me', { method: 'PUT', body: JSON.stringify({
-        about: updated.mentorAbout, specialization: updated.mentorSpecialization,
-        skills: updated.mentorSkills.split(',').map((value) => value.trim()).filter(Boolean),
-        experience: updated.mentorExperience, company: updated.mentorCompany,
-        position: updated.mentorPosition, timezone: updated.timezone,
-        default_meeting_url: updated.telemostUrl || null, accepting_students: true,
-      }) })
-    }, 'Профиль сохранён'),
-    login: async (credentials) => {
-      await authenticate('/auth/login', credentials)
-      setLoggedIn(true)
-      await invalidate()
-    },
-    register: async (data) => {
-      await authenticate('/auth/register', data)
-      setSelectedMode(data.initial_role)
-      setLoggedIn(true)
-      await invalidate()
-    },
-    logout: async () => {
-      try { await api('/auth/logout', { method: 'POST' }) } catch {
-        // The local session must end even when the API is unavailable.
-      } finally {
-        clearSession(); setLoggedIn(false); queryClient.clear()
-      }
-    },
-    addRole: (role) => perform(
-      () => api('/auth/roles', { method: 'POST', body: JSON.stringify({ role }) }),
-      'Роль добавлена',
-    ),
-    connectTelegram: () => perform(async () => {
-      const result = await api<{ url: string }>('/telegram/link', { method: 'POST' })
-      window.open(result.url, '_blank', 'noopener,noreferrer')
-    }, 'Откройте Telegram для подключения'),
-    dismissNotice: () => setNotice(null),
-  }
-
-  return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>
-}
 
 export function usePlatformState() {
   const value = useContext(PlatformContext)

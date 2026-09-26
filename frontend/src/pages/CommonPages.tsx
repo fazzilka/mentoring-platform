@@ -1,5 +1,5 @@
 import { Alert, Avatar, Badge, Button, Divider, Group, Select, SimpleGrid, Stack, Tabs, Text, TextInput, Textarea, Title } from '@mantine/core'
-import { IconBell, IconBrandTelegram, IconCalendarEvent, IconCheck, IconDeviceFloppy, IconPalette, IconUser } from '@tabler/icons-react'
+import { IconBell, IconCalendarEvent, IconCheck, IconDeviceFloppy, IconPalette, IconUser } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyContent } from '../shared/components/EmptyContent'
@@ -9,7 +9,7 @@ import { usePlatformState } from '../features/platform/usePlatformState'
 import type { ProfileDraft } from '../shared/types'
 
 export function Profile() {
-  const { profile, saveProfile, roles, addRole } = usePlatformState()
+  const { profile, saveProfile, roles } = usePlatformState()
   const [draft, setDraft] = useState<ProfileDraft>(profile)
   const setField = (field: keyof ProfileDraft, value: string) => setDraft((current) => ({ ...current, [field]: value }))
   useEffect(() => setDraft(profile), [profile])
@@ -20,7 +20,7 @@ export function Profile() {
       <Surface><Stack align="center" py="md"><Avatar src={draft.avatarUrl || undefined} size={88} radius="xl">{draft.firstName[0]}{draft.lastName[0]}</Avatar><Title order={3}>{draft.firstName} {draft.lastName}</Title><Text size="sm" c="dimmed">{roles.map((role) => role === 'student' ? 'Ученик' : 'Наставник').join(' и ')}</Text><TextInput w="100%" label="Ссылка на аватар" placeholder="https://..." value={draft.avatarUrl} onChange={(event) => setField('avatarUrl', event.currentTarget.value)} /></Stack></Surface>
       <div className="span-two"><Surface><Title order={3}>Основная информация</Title><SimpleGrid cols={{ base: 1, sm: 2 }} mt="lg"><TextInput label="Имя" value={draft.firstName} onChange={(event) => setField('firstName', event.currentTarget.value)} /><TextInput label="Фамилия" value={draft.lastName} onChange={(event) => setField('lastName', event.currentTarget.value)} /><TextInput type="email" label="Email" value={draft.email} onChange={(event) => setField('email', event.currentTarget.value)} /><Select label="Часовой пояс" value={draft.timezone} onChange={(value) => setField('timezone', value ?? draft.timezone)} data={[{ value: 'Europe/Moscow', label: 'Москва · UTC+3' }, { value: 'Asia/Yekaterinburg', label: 'Екатеринбург · UTC+5' }, { value: 'Asia/Novosibirsk', label: 'Новосибирск · UTC+7' }]} /></SimpleGrid></Surface></div>
     </SimpleGrid>
-    {roles.length === 1 && <Alert color="indigo" title="Вторая роль"><Group justify="space-between" gap="sm"><Text size="sm">Один аккаунт может быть учеником и наставником.</Text><Button variant="light" onClick={() => addRole(roles[0] === 'student' ? 'mentor' : 'student')}>Добавить роль {roles[0] === 'student' ? 'наставника' : 'ученика'}</Button></Group></Alert>}
+    <Alert color="indigo" title="Демонстрационный аккаунт">В лабораторной №1 доступны обе роли. Изменения профиля сохраняются только в этом браузере.</Alert>
     <Tabs defaultValue={roles[0]} variant="outline">
       <Tabs.List>{roles.includes('student') && <Tabs.Tab value="student">Профиль ученика</Tabs.Tab>}{roles.includes('mentor') && <Tabs.Tab value="mentor">Профиль наставника</Tabs.Tab>}</Tabs.List>
       {roles.includes('student') && <Tabs.Panel value="student" pt="lg"><Surface><Stack gap="md"><Textarea label="О себе" minRows={3} value={draft.studentAbout} onChange={(event) => setField('studentAbout', event.currentTarget.value)} /><SimpleGrid cols={{ base: 1, sm: 2 }}><Select label="Текущий уровень" value={draft.studentLevel || null} onChange={(value) => setField('studentLevel', value ?? '')} data={['Intern', 'Junior', 'Middle', 'Senior']} /><TextInput label="Направление" value={draft.studentDirection} onChange={(event) => setField('studentDirection', event.currentTarget.value)} /><TextInput label="Цель" value={draft.studentGoal} onChange={(event) => setField('studentGoal', event.currentTarget.value)} /><TextInput label="Технологии через запятую" value={draft.studentTechnologies} onChange={(event) => setField('studentTechnologies', event.currentTarget.value)} /></SimpleGrid><Textarea label="Что хочу изучить" value={draft.studentLearning} onChange={(event) => setField('studentLearning', event.currentTarget.value)} /></Stack></Surface></Tabs.Panel>}
@@ -39,12 +39,10 @@ export function Notifications() {
 
 export function Settings() {
   const navigate = useNavigate()
-  const { telegramConnected, connectTelegram } = usePlatformState()
   return <Stack gap="xl">
-    <PageHeader eyebrow="Аккаунт" title="Настройки" description="Каналы связи и параметры интерфейса." />
+    <PageHeader eyebrow="Аккаунт" title="Настройки" description="Демонстрационный режим и параметры интерфейса." />
     <Surface><Group gap="md"><div className="icon-tile"><IconUser size={20} /></div><div><Title order={3}>Аккаунт</Title><Text size="sm" c="dimmed">Email и часовой пояс редактируются в профиле</Text></div></Group><Divider my="lg" /><Button variant="light" onClick={() => navigate('/profile')}>Открыть профиль</Button></Surface>
-    <Surface><Group gap="md"><div className="icon-tile"><IconBell size={20} /></div><div><Title order={3}>Напоминания</Title><Text size="sm" c="dimmed">Уведомления в приложении и email за 60 и 5 минут до подтверждённой встречи.</Text></div></Group></Surface>
-    <Surface><Group gap="md"><div className="icon-tile"><IconBrandTelegram size={20} /></div><div style={{ flex: 1 }}><Title order={3}>Telegram</Title><Text size="sm" c="dimmed">{telegramConnected ? 'Подключён для напоминаний' : 'Не подключён'}</Text></div><Button variant="default" leftSection={<IconBrandTelegram size={17} />} onClick={connectTelegram}>{telegramConnected ? 'Подключить заново' : 'Подключить'}</Button></Group><Text size="xs" c="dimmed" mt="md">Telegram используется только для уведомлений, не для переписки с наставником.</Text></Surface>
+    <Surface><Group gap="md"><div className="icon-tile"><IconBell size={20} /></div><div><Title order={3}>Уведомления на сайте</Title><Text size="sm" c="dimmed">Изменения встреч и новые заявки появляются в локальной истории. Email и Telegram не используются.</Text></div></Group><Divider my="lg" /><Button variant="light" onClick={() => navigate('/notifications')}>Открыть уведомления</Button></Surface>
     <Surface><Group gap="md"><div className="icon-tile"><IconPalette size={20} /></div><div style={{ flex: 1 }}><Title order={3}>Интерфейс</Title><Text size="sm" c="dimmed">Светлая тема</Text></div><Badge variant="light" leftSection={<IconCheck size={14} />}>Активна</Badge></Group><Text size="sm" c="dimmed" mt="lg">Системные настройки reduced motion, reduced transparency и повышенного контраста учитываются автоматически.</Text></Surface>
   </Stack>
 }

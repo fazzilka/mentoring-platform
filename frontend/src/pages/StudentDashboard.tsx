@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Group, SegmentedControl, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { IconAlertCircle, IconArrowRight, IconCalendarEvent, IconNotes } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { AvatarMark } from '../shared/components/AvatarMark'
@@ -7,6 +7,7 @@ import { MeetingList } from '../shared/components/MeetingList'
 import { PageHeader } from '../shared/components/PageHeader'
 import { Surface } from '../shared/components/Surface'
 import { usePlatformState } from '../features/platform/usePlatformState'
+import type { StudentScenario } from '../shared/types'
 
 function StudentProfileCard() {
   const { profile } = usePlatformState()
@@ -25,7 +26,7 @@ function StudentProfileCard() {
 }
 
 export function StudentDashboard() {
-  const { scenario, currentMentor, meetings, reflections, profile, user } = usePlatformState()
+  const { scenario, setScenario, currentMentor, meetings, reflections, profile, user } = usePlatformState()
   const navigate = useNavigate()
   const upcoming = meetings.filter((meeting) => meeting.studentId === user?.id && ['pending', 'confirmed'].includes(meeting.status)).sort((a, b) => a.startsAt.localeCompare(b.startsAt))
   const latestReflection = reflections.find((item) => item.author === 'student')
@@ -55,6 +56,9 @@ export function StudentDashboard() {
       ) : (
         <><EmptyState /><StudentProfileCard /></>
       )}
+      <section className="scenario-panel">
+        <Surface><Stack gap="sm"><Text fw={650} size="sm">Демонстрация для лабораторной №1</Text><Text size="xs" c="dimmed">Переключатель меняет только локальные mock-данные. История встреч и заметок сохраняется.</Text><SegmentedControl aria-label="Демонстрационный сценарий ученика" value={scenario} onChange={(value) => setScenario(value as StudentScenario)} data={[{ label: 'Без ментора', value: 'none' }, { label: 'Есть ментор', value: 'active' }, { label: 'Ментор ушёл', value: 'departed' }]} /></Stack></Surface>
+      </section>
     </Stack>
   )
 }

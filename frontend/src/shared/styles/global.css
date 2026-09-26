@@ -185,9 +185,9 @@ button:active, .mantine-Button-root:active, .mantine-ActionIcon-root:active { tr
 .profile-facts { padding-left: var(--space-6); border-left: 1px solid var(--color-border); }
 .profile-availability { padding-top: 2.25rem; border-top: 1px solid var(--color-border); }
 
-.meeting-row { display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(290px, 1fr) auto; align-items: center; gap: var(--space-5); }
-.meeting-facts { display: grid; grid-template-columns: minmax(130px, 1fr) auto auto; align-items: center; gap: var(--space-5); }
-.meeting-actions { justify-content: flex-end; }
+.meeting-row { display: grid; grid-template-columns: minmax(220px, 1fr) auto; align-items: center; gap: var(--space-5); }
+.meeting-facts { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-5); }
+.meeting-actions { grid-column: 1 / -1; justify-content: flex-start; }
 .meeting-row.compact { grid-template-columns: 1fr; gap: var(--space-4); }
 .meeting-row.compact .meeting-facts { width: 100%; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-4); }
 .meeting-row.compact .meeting-actions { justify-content: flex-start; }
@@ -262,6 +262,9 @@ button:active, .mantine-Button-root:active, .mantine-ActionIcon-root:active { tr
   .meeting-row { grid-template-columns: 1fr; }
   .meeting-facts { width: 100%; }
   .meeting-actions { justify-content: flex-start; }
+  .filter-bar { align-items: stretch; flex-direction: column; }
+  .search-input { min-width: 0; width: 100%; }
+  .profile-header-grid, .mentor-summary-grid { flex-wrap: wrap; }
 }
 
 @media (max-width: 767px) {
@@ -315,6 +318,7 @@ button:active, .mantine-Button-root:active, .mantine-ActionIcon-root:active { tr
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  button:active, .mantine-Button-root:active, .mantine-ActionIcon-root:active, .nav-link:active, .notification-row:active { transform: none; }
 }
 
 @media (prefers-reduced-transparency: reduce) {
