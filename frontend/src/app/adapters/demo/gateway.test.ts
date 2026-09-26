@@ -95,8 +95,8 @@ test('gateway rejects a duplicate booking and cancellation preserves meeting his
 test('departure preserves reflections and permits selecting a new mentor', async () => {
   const gateway = createDemoGateway()
   const notes = gateway.getSnapshot().reflections.length
-  gateway.getSnapshot().setScenario('active')
-  gateway.getSnapshot().setScenario('departed')
+  await gateway.getSnapshot().selectMentor(gateway.getSnapshot().mentors[0])
+  await gateway.getSnapshot().departMentor()
   assert.equal(gateway.getSnapshot().scenario, 'departed')
   assert.equal(gateway.getSnapshot().reflections.length, notes)
   assert.equal(await gateway.getSnapshot().selectMentor(gateway.getSnapshot().mentors[1]), true)

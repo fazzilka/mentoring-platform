@@ -1,4 +1,4 @@
-"""Database models will be introduced in laboratory work No. 2."""
+"""Domain and infrastructure database models."""
 
 from src.models.auth_session import AuthSession
 from src.models.availability_slot import AvailabilitySlot

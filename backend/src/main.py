@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Awaitable, Callable
 from time import perf_counter
 
@@ -10,10 +11,13 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 from src.api.v1.router import router as api_v1_router
 from src.core.config import get_settings
 from src.core.errors import DomainError
+from src.core.logging import configure_logging
 from src.core.security import jwt_secret
 from src.schemas.health import HealthResponse
 
 settings = get_settings()
+configure_logging()
+logger = logging.getLogger(__name__)
 jwt_secret()
 app = FastAPI(title=settings.app_name, debug=settings.debug)
 allowed_origins = [settings.frontend_origin]
@@ -43,11 +47,22 @@ async def record_metrics(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     started = perf_counter()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as error:
+        logger.error("http_request_failed exception_type=%s", type(error).__name__)
+        response = JSONResponse(status_code=500, content={"detail": "Внутренняя ошибка сервера"})
     route = request.scope.get("route")
     route_name = getattr(route, "path", "unmatched")
     request_count.labels(request.method, route_name, str(response.status_code)).inc()
     request_duration.labels(request.method, route_name).observe(perf_counter() - started)
+    logger.info(
+        "http_request method=%s route=%s status=%s latency_ms=%.1f",
+        request.method,
+        route_name,
+        response.status_code,
+        (perf_counter() - started) * 1000,
+    )
     return response
 
 

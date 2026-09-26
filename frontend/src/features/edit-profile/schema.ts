@@ -17,7 +17,8 @@ export const profileSchema = z.object({
   }, 'Укажите существующий часовой пояс'),
   studentAbout: text, studentLevel: text, studentDirection: text, studentGoal: text,
   studentTechnologies: text, studentLearning: text, mentorAbout: text,
-  mentorSpecialization: z.enum(specializations), mentorSkills: text, mentorExperience: text,
+  mentorSpecialization: z.enum(specializations), mentorSkills: text,
+  mentorExperience: z.string().refine(value => value === '' || /^\d{1,3}$/.test(value) && Number(value) <= 100, 'Укажите целое количество лет от 0 до 100'),
   mentorCompany: text, mentorPosition: text,
   telemostUrl: z.string().refine(value => {
     if (!value) return true

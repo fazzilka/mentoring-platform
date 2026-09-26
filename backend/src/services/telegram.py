@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
@@ -12,7 +13,11 @@ from src.models import TelegramConnection, User
 
 async def create_deep_link(db: AsyncSession, user: User) -> str:
     username = get_settings().telegram_bot_username
-    if not username:
+    if (
+        not username
+        or not get_settings().telegram_bot_token
+        or not get_settings().telegram_webhook_secret
+    ):
         raise HTTPException(503, "Telegram Bot не настроен")
     token = new_refresh_token()
     connection = await db.scalar(
@@ -40,5 +45,9 @@ async def connect_from_start(db: AsyncSession, token: str, chat_id: str) -> uuid
     connection.chat_id = chat_id
     connection.link_token_hash = None
     connection.link_expires_at = None
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "Этот Telegram уже подключён к другому аккаунту") from None
     return connection.user_id

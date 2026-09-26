@@ -192,6 +192,7 @@ export function createDemoGateway(owner = 'lab-demo'): PlatformGateway {
     ...state, user, roles: demoRoles, scenario, assignment, currentMentor, claimedSlotIds,
     notice, noticeIsError, unreadCount: state.notifications.filter((item) => !item.read).length,
     setScenario,
+    departMentor: async () => { setScenario('departed'); return true },
     setMode: (mode: AppMode) => setState((current) => current.mode === mode ? current : { ...current, mode }),
     selectMentor, requestMeeting, addAvailability, removeAvailability, saveReflection, saveProfile,
     cancelMeeting: (id: string) => changeMeeting(id, 'cancelled', 'student'),
@@ -199,6 +200,10 @@ export function createDemoGateway(owner = 'lab-demo'): PlatformGateway {
     markAllNotificationsRead: async () => {
       setState((current) => ({ ...current, notifications: current.notifications.map((item) => ({ ...item, read: true })) }))
       setNotice('Уведомления прочитаны')
+      return true
+    },
+    markNotificationRead: async (id: string) => {
+      setState(current => ({ ...current, notifications: current.notifications.map(item => item.id === id ? { ...item, read: true } : item) }))
       return true
     },
     dismissNotice: () => setNotice(null),

@@ -1,5 +1,6 @@
 import { useAssignmentGateway } from '../entities/assignment/model'
 import { useMentorGateway } from '../entities/mentor/model'
+import { useUserGateway } from '../entities/user/model'
 import { Alert, Button, SimpleGrid, Stack, Text } from '@mantine/core'
 import { IconCheck, IconSearch } from '@tabler/icons-react'
 import { useState } from 'react'
@@ -15,8 +16,9 @@ export function MentorCatalog() {
   const [specialization, setSpecialization] = useState<MentorFilter>('Все')
   const { scenario } = useAssignmentGateway()
   const { mentors } = useMentorGateway()
+  const { user } = useUserGateway()
   const navigate = useNavigate()
-  const filtered = filterMentors(searchMentors(mentors, search), specialization)
+  const filtered = filterMentors(searchMentors(mentors.filter(item => item.id !== user?.id && item.status === 'online'), search), specialization)
 
   if (scenario === 'active') {
     return <Stack gap="xl"><PageHeader eyebrow="Каталог" title="Наставники" /><Alert icon={<IconCheck size={20} />} title="У вас уже есть активный ментор" color="indigo">Одновременно можно работать только с одним наставником. Самостоятельная смена ментора не предусмотрена.</Alert><Button w="fit-content" onClick={() => navigate('/student/my-mentor')}>Открыть «Мой ментор»</Button></Stack>

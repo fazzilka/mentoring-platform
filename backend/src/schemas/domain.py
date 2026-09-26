@@ -102,6 +102,8 @@ class MeetingResponse(OrmResponse):
     id: UUID
     student_id: UUID
     mentor_id: UUID
+    student_name: str
+    mentor_name: str
     assignment_id: UUID
     availability_slot_id: UUID
     starts_at: datetime

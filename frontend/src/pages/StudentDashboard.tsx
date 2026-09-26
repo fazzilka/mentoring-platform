@@ -2,7 +2,7 @@ import { useUserGateway } from '../entities/user/model'
 import { useAssignmentGateway } from '../entities/assignment/model'
 import { useMeetingGateway } from '../entities/meeting/model'
 import { useReflectionGateway } from '../entities/reflection/model'
-import { Alert, Badge, Button, Group, SegmentedControl, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Alert, Badge, Button, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { IconAlertCircle, IconArrowRight, IconCalendarEvent, IconNotes } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
 import { AvatarMark } from '../shared/ui/AvatarMark'
@@ -10,7 +10,6 @@ import { EmptyState } from '../shared/ui/EmptyState'
 import { MeetingList } from '../features/manage-meeting-request/MeetingList'
 import { PageHeader } from '../shared/ui/PageHeader'
 import { Surface } from '../shared/ui/Surface'
-import type { StudentScenario } from '../entities'
 
 function StudentProfileCard() {
   const { profile } = useUserGateway()
@@ -29,7 +28,7 @@ function StudentProfileCard() {
 }
 
 export function StudentDashboard() {
-  const { scenario, setScenario, currentMentor } = useAssignmentGateway()
+  const { scenario, currentMentor } = useAssignmentGateway()
   const { meetings } = useMeetingGateway()
   const { reflections } = useReflectionGateway()
   const { profile, user } = useUserGateway()
@@ -62,9 +61,6 @@ export function StudentDashboard() {
       ) : (
         <><EmptyState /><StudentProfileCard /></>
       )}
-      <section className="scenario-panel">
-        <Surface><Stack gap="sm"><Text fw={650} size="sm">Демонстрация для лабораторной №1</Text><Text size="xs" c="dimmed">Переключатель меняет только локальные mock-данные. История встреч и заметок сохраняется.</Text><SegmentedControl aria-label="Демонстрационный сценарий ученика" value={scenario} onChange={(value) => setScenario(value as StudentScenario)} data={[{ label: 'Без ментора', value: 'none' }, { label: 'Есть ментор', value: 'active' }, { label: 'Ментор ушёл', value: 'departed' }]} /></Stack></Surface>
-      </section>
     </Stack>
   )
 }

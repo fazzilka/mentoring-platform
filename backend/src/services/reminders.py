@@ -1,6 +1,8 @@
+import logging
 import smtplib
 import uuid
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy import select
@@ -11,6 +13,8 @@ from src.core.config import get_settings
 from src.integrations.email.client import send_email
 from src.integrations.telegram.client import send_telegram
 from src.models import Meeting, Notification, NotificationDelivery, TelegramConnection, User
+
+logger = logging.getLogger(__name__)
 
 
 async def due_meetings(db: AsyncSession, now: datetime) -> list[Meeting]:
@@ -64,7 +68,7 @@ async def create_web_notification(
             id=uuid.uuid4(),
             user_id=user_id,
             title="Скоро встреча с наставником",
-            body=f"Встреча начнётся через {offset} минут.",
+            body=f"Напоминание за {offset} минут до встречи. Проверьте время в расписании.",
             is_read=False,
             deduplication_key=key,
         )
@@ -84,7 +88,13 @@ async def send_due_reminders(db: AsyncSession, now: datetime | None = None) -> N
                 user = await db.get(User, user_id)
                 if user is None:
                     continue
-                body = f"Встреча Mentoring Platform начнётся через {offset} минут."
+                local_time = meeting.starts_at.astimezone(ZoneInfo(user.timezone))
+                body = (
+                    f"Напоминание за {offset} минут до встречи.\n"
+                    f"Ученик: {meeting.student_name}\nНаставник: {meeting.mentor_name}\n"
+                    f"Дата и время: {local_time:%d.%m.%Y %H:%M} ({user.timezone})\n"
+                    f"Длительность: {meeting.duration_minutes} минут."
+                )
                 if meeting.meeting_url:
                     body = f"{body}\nТелемост: {meeting.meeting_url}"
                 email_delivery = await claim_delivery(db, meeting.id, user_id, "email", offset)
@@ -92,6 +102,9 @@ async def send_due_reminders(db: AsyncSession, now: datetime | None = None) -> N
                     try:
                         send_email(user.email, "Напоминание о встрече", body)
                     except OSError, TimeoutError, smtplib.SMTPException:
+                        logger.warning(
+                            "reminder_delivery_failed channel=email delivery_id=%s", email_delivery
+                        )
                         await mark_delivery(db, email_delivery, False)
                     else:
                         await mark_delivery(db, email_delivery, True)
@@ -108,6 +121,10 @@ async def send_due_reminders(db: AsyncSession, now: datetime | None = None) -> N
                         try:
                             send_telegram(connection.chat_id, body)
                         except OSError, RuntimeError, httpx.HTTPError:
+                            logger.warning(
+                                "reminder_delivery_failed channel=telegram delivery_id=%s",
+                                telegram_delivery,
+                            )
                             await mark_delivery(db, telegram_delivery, False)
                         else:
                             await mark_delivery(db, telegram_delivery, True)

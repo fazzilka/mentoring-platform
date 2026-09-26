@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import type { PlatformGateway, PlatformSnapshot } from '../../entities/gateway'
 import { UserGatewayContext } from '../../entities/user/model'
@@ -10,7 +10,8 @@ import { MeetingGatewayContext } from '../../entities/meeting/model'
 import { ReflectionGatewayContext } from '../../entities/reflection/model'
 import { NotificationGatewayContext } from '../../entities/notification/model'
 import { createGatewayContext } from '../../shared/lib/gateway'
-import { createDemoGateway } from '../adapters/demo/gateway'
+import { createApiGateway } from '../adapters/api/gateway'
+import { useQueryClient } from '@tanstack/react-query'
 
 const LoaderContext = createContext<PlatformGateway['load'] | null>(null)
 const feedback = createGatewayContext<Pick<PlatformSnapshot, 'notice' | 'noticeIsError' | 'dismissNotice'>>()
@@ -40,39 +41,44 @@ function scope<K extends keyof PlatformSnapshot>(gateway: PlatformGateway, keys:
 
 export function GatewayProvider({ children, gateway: supplied }: { children: ReactNode; gateway?: PlatformGateway }) {
   const auth = useAuth()
+  const queryClient = useQueryClient()
+  useEffect(() => { if (!auth.user) queryClient.clear() }, [auth.user, queryClient])
+  if (!auth.user && !supplied) return children
   return <DomainGateways key={auth.user?.id ?? 'anonymous'} gateway={supplied}>{children}</DomainGateways>
 }
 
 function DomainGateways({ children, gateway: supplied }: { children: ReactNode; gateway?: PlatformGateway }) {
   const auth = useAuth()
+  const queryClient = useQueryClient()
   const [gateways] = useState(() => {
-    const gateway = supplied ?? createDemoGateway(auth.user?.id ?? 'anonymous')
+    if (!supplied && !auth.user) throw new Error('Требуется авторизованный пользователь')
+    const gateway = supplied ?? createApiGateway(queryClient, auth, auth.user!)
     return {
       load: gateway.load,
       user: scope(gateway, ['user', 'profile', 'roles', 'mode', 'setMode', 'saveProfile']),
       mentor: scope(gateway, ['mentors']),
       student: scope(gateway, ['students']),
-      assignment: scope(gateway, ['scenario', 'assignment', 'currentMentor', 'setScenario', 'selectMentor']),
+      assignment: scope(gateway, ['scenario', 'assignment', 'currentMentor', 'departMentor', 'selectMentor']),
       availability: scope(gateway, ['availability', 'claimedSlotIds', 'addAvailability', 'removeAvailability']),
       meeting: scope(gateway, ['meetings', 'requestMeeting', 'cancelMeeting', 'updateMeetingStatus']),
       reflection: scope(gateway, ['reflections', 'saveReflection']),
-      notification: scope(gateway, ['notifications', 'unreadCount', 'markAllNotificationsRead']),
+      notification: scope(gateway, ['notifications', 'unreadCount', 'markAllNotificationsRead', 'markNotificationRead']),
       feedback: scope(gateway, ['notice', 'noticeIsError', 'dismissNotice']),
     }
   })
-  const demo = useSyncExternalStore(gateways.user.subscribe, gateways.user.getSnapshot)
+  const domain = useSyncExternalStore(gateways.user.subscribe, gateways.user.getSnapshot)
   const userSnapshot = useMemo(() => {
     const roles = auth.user?.roles ?? []
-    const mode = roles.includes(demo.mode) ? demo.mode : roles[0] ?? 'student'
+    const mode = roles.includes(domain.mode) ? domain.mode : roles[0] ?? 'student'
     return {
-      ...demo, mode, roles, user: auth.user, loggedIn: auth.status === 'authenticated',
-      profile: { ...demo.profile, ...(auth.user ? {
+      ...domain, mode, roles, user: auth.user, loggedIn: auth.status === 'authenticated',
+      profile: { ...domain.profile, ...(auth.user ? {
         firstName: auth.user.first_name, lastName: auth.user.last_name, email: auth.user.email,
         timezone: auth.user.timezone, avatarUrl: auth.user.avatar_url ?? '',
       } : {}) },
-      setMode: (next: typeof mode) => { if (roles.includes(next)) demo.setMode(next) },
+      setMode: (next: typeof mode) => { if (roles.includes(next)) domain.setMode(next) },
     }
-  }, [auth.user, auth.status, demo])
+  }, [auth.user, auth.status, domain])
   const userGateway = useMemo(() => ({ getSnapshot: () => userSnapshot, subscribe: gateways.user.subscribe }), [userSnapshot, gateways.user])
   return <LoaderContext.Provider value={gateways.load}>
     <UserGatewayContext.Provider value={userGateway}>
