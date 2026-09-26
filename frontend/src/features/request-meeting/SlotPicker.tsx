@@ -8,10 +8,12 @@ import { useNavigate } from 'react-router-dom'
 import type { Mentor, TimeSlot } from '../../entities'
 import { EmptyContent } from '../../shared/ui/EmptyContent'
 import { Surface } from '../../shared/ui/Surface'
+import { useUserGateway } from '../../entities/user/model'
 
 export function SlotPicker({ mentor }: { mentor: Mentor }) {
   const { claimedSlotIds } = useAvailabilityGateway()
   const { requestMeeting } = useRequestMeeting()
+  const { profile } = useUserGateway()
   const [selected, setSelected] = useState<TimeSlot | null>(null)
   const navigate = useNavigate()
   const slots = mentor.availableSlots.filter((slot) => !claimedSlotIds.includes(slot.id))
@@ -43,7 +45,7 @@ export function SlotPicker({ mentor }: { mentor: Mentor }) {
               </Stack>
             </Surface>
             <Text size="sm" c="dimmed">Наставник получит заявку и подтвердит встречу. Ссылка на Телемост появится после подтверждения.</Text>
-            <Radio checked readOnly label={`Время показано в вашем часовом поясе (${Intl.DateTimeFormat().resolvedOptions().timeZone})`} />
+            <Radio checked readOnly label={`Время показано в вашем часовом поясе (${profile.timezone})`} />
             <Group justify="flex-end"><Button variant="default" onClick={() => setSelected(null)}>Отмена</Button><Button leftSection={<IconCalendarEvent size={17} />} onClick={async () => { if (await requestMeeting(mentor, selected)) { setSelected(null); navigate('/student/meetings') } }}>Отправить заявку</Button></Group>
           </Stack>
         )}

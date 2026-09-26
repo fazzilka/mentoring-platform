@@ -23,7 +23,7 @@ export type PlatformSnapshot = Omit<PlatformData, 'assignments'> & {
   notice: string | null
   noticeIsError: boolean
   unreadCount: number
-  setScenario: (scenario: StudentScenario) => void
+  departMentor: () => Promise<boolean>
   setMode: (mode: AppMode) => void
   selectMentor: (mentor: Mentor) => Promise<boolean>
   requestMeeting: (mentor: Mentor, slot: TimeSlot) => Promise<boolean>
@@ -34,6 +34,7 @@ export type PlatformSnapshot = Omit<PlatformData, 'assignments'> & {
   saveReflection: (id: string, author: MeetingAudience, summary: string, nextStep?: string) => Promise<boolean>
   saveProfile: (profile: ProfileDraft) => Promise<boolean>
   markAllNotificationsRead: () => Promise<boolean>
+  markNotificationRead: (id: string) => Promise<boolean>
   dismissNotice: () => void
 }
 

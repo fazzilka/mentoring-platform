@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { appModes, type Credentials, type Registration, type ProfileDraft } from '../../entities/user/types'
 
-const api = (import.meta.env?.VITE_API_URL ?? '/api/v1').replace(/\/$/, '')
+import { HttpError, httpRequest } from '../../shared/api/http'
 const tokenSchema = z.object({ access_token: z.string(), expires_in: z.number().positive() })
 const userSchema = z.object({
   id: z.string().uuid(), name: z.string(), email: z.string(), roles: z.array(z.enum(appModes)).min(1),
@@ -12,10 +12,6 @@ export interface AuthSnapshot {
   status: 'loading' | 'authenticated' | 'anonymous' | 'error'
   user: AuthUser | null
   error: string
-}
-
-class HttpError extends Error {
-  constructor(public status: number, message: string) { super(message) }
 }
 
 export function createAuthClient() {
@@ -29,20 +25,7 @@ export function createAuthClient() {
   const publish = (next: AuthSnapshot) => { snapshot = next; listeners.forEach(listener => listener()) }
   const clear = () => { token = null; expiresAt = 0; publish({ status: 'anonymous', user: null, error: '' }) }
 
-  async function request(path: string, init: RequestInit = {}, access?: string | null): Promise<unknown> {
-    const response = await fetch(`${api}${path}`, {
-      ...init, credentials: 'include', headers: {
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(access ? { Authorization: `Bearer ${access}` } : {}), ...init.headers,
-      },
-    })
-    if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null)
-      const detail = z.object({ detail: z.string() }).safeParse(payload)
-      throw new HttpError(response.status, detail.success ? detail.data.detail : 'Не удалось выполнить запрос')
-    }
-    return response.status === 204 ? null : response.json()
-  }
+  const request = httpRequest
 
   async function authenticate(path: string, body?: Credentials | Registration) {
     const current = generation

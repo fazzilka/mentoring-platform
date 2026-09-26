@@ -6,12 +6,15 @@ import { useNotificationGateway } from '../entities/notification/model'
 import { useMarkNotificationsRead } from '../features/mark-notifications-read/model'
 import { Alert, Avatar, Badge, Button, Divider, Group, Select, SimpleGrid, Stack, Tabs, Text, TextInput, Textarea, Title } from '@mantine/core'
 import { IconBell, IconCalendarEvent, IconCheck, IconDeviceFloppy, IconPalette, IconUser } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyContent } from '../shared/ui/EmptyContent'
 import { PageHeader } from '../shared/ui/PageHeader'
 import { Surface } from '../shared/ui/Surface'
 import type { ProfileDraft } from '../entities'
+import { TelegramConnection } from '../features/connect-telegram/TelegramConnection'
+import { useAssignmentGateway } from '../entities/assignment/model'
+import { Dialog } from '../shared/ui/Dialog'
 
 export function Profile() {
   const { profile, roles } = useUserGateway()
@@ -27,7 +30,6 @@ export function Profile() {
   }
   const errors = formErrors(profileSchema, draft)
   const setField = (field: keyof ProfileDraft, value: string) => setDraft((current) => ({ ...current, [field]: value }))
-  useEffect(() => setDraft(profile), [profile])
 
   return <Stack gap="xl">
     <PageHeader eyebrow="Аккаунт" title="Профиль" description="Общие данные и профили для ваших ролей." action={<Button loading={saving} leftSection={<IconDeviceFloppy size={17} />} onClick={save}>Сохранить изменения</Button>} />
@@ -36,7 +38,7 @@ export function Profile() {
       <Surface><Stack align="center" py="md"><Avatar src={draft.avatarUrl || undefined} size={88} radius="xl">{draft.firstName[0]}{draft.lastName[0]}</Avatar><Title order={3}>{draft.firstName} {draft.lastName}</Title><Text size="sm" c="dimmed">{roles.map((role) => role === 'student' ? 'Ученик' : 'Наставник').join(' и ')}</Text><TextInput w="100%" label="Ссылка на аватар" placeholder="https://..." error={errors.avatarUrl} value={draft.avatarUrl} onChange={(event) => setField('avatarUrl', event.currentTarget.value)} /></Stack></Surface>
       <div className="span-two"><Surface><Title order={3}>Основная информация</Title><SimpleGrid cols={{ base: 1, sm: 2 }} mt="lg"><TextInput label="Имя" error={errors.firstName} value={draft.firstName} onChange={(event) => setField('firstName', event.currentTarget.value)} /><TextInput label="Фамилия" error={errors.lastName} value={draft.lastName} onChange={(event) => setField('lastName', event.currentTarget.value)} /><TextInput type="email" label="Email" error={errors.email} value={draft.email} onChange={(event) => setField('email', event.currentTarget.value)} /><Select label="Часовой пояс" error={errors.timezone} value={draft.timezone} onChange={(value) => setField('timezone', value ?? draft.timezone)} data={[{ value: 'Europe/Moscow', label: 'Москва · UTC+3' }, { value: 'Asia/Yekaterinburg', label: 'Екатеринбург · UTC+5' }, { value: 'Asia/Novosibirsk', label: 'Новосибирск · UTC+7' }]} /></SimpleGrid></Surface></div>
     </SimpleGrid>
-    <Alert color="indigo" title="Лабораторная №4">Аккаунт и основные данные сохраняются на сервере. Учебные данные профиля и встречи пока демонстрационные; роли получены с сервера.</Alert>
+    <Alert color="indigo" title="Ваши данные">Профили, встречи и заметки сохраняются на сервере. Приватные заметки доступны только участникам встречи согласно их роли.</Alert>
     <Tabs defaultValue={roles[0]} variant="outline">
       <Tabs.List>{roles.includes('student') && <Tabs.Tab value="student">Профиль ученика</Tabs.Tab>}{roles.includes('mentor') && <Tabs.Tab value="mentor">Профиль наставника</Tabs.Tab>}</Tabs.List>
       {roles.includes('student') && <Tabs.Panel value="student" pt="lg"><Surface><Stack gap="md"><Textarea label="О себе" minRows={3} error={errors.studentAbout} value={draft.studentAbout} onChange={(event) => setField('studentAbout', event.currentTarget.value)} /><SimpleGrid cols={{ base: 1, sm: 2 }}><Select label="Текущий уровень" value={draft.studentLevel || null} onChange={(value) => setField('studentLevel', value ?? '')} data={['Intern', 'Junior', 'Middle', 'Senior']} /><TextInput label="Направление" error={errors.studentDirection} value={draft.studentDirection} onChange={(event) => setField('studentDirection', event.currentTarget.value)} /><TextInput label="Цель" error={errors.studentGoal} value={draft.studentGoal} onChange={(event) => setField('studentGoal', event.currentTarget.value)} /><TextInput label="Технологии через запятую" error={errors.studentTechnologies} value={draft.studentTechnologies} onChange={(event) => setField('studentTechnologies', event.currentTarget.value)} /></SimpleGrid><Textarea label="Что хочу изучить" error={errors.studentLearning} value={draft.studentLearning} onChange={(event) => setField('studentLearning', event.currentTarget.value)} /></Stack></Surface></Tabs.Panel>}
@@ -46,20 +48,26 @@ export function Profile() {
 }
 
 export function Notifications() {
-  const { notifications } = useNotificationGateway()
+  const { notifications, markNotificationRead } = useNotificationGateway()
   const { markAllNotificationsRead } = useMarkNotificationsRead()
   return <Stack gap="xl">
     <PageHeader eyebrow="Центр событий" title="Уведомления" description="Подтверждения, напоминания и новые заявки." action={<Button variant="subtle" disabled={!notifications.some((item) => !item.read)} onClick={markAllNotificationsRead}>Отметить все как прочитанные</Button>} />
-    {notifications.length > 0 ? <div className="notification-feed">{notifications.map((item) => { const Icon = item.kind === 'meeting' ? IconCalendarEvent : IconBell; return <div className={`notification-row${item.read ? '' : ' unread'}`} key={item.id}><Group align="flex-start" wrap="nowrap"><div className="activity-icon"><Icon size={19} /></div><div style={{ flex: 1 }}><Group gap="xs"><Text fw={item.read ? 550 : 650}>{item.title}</Text>{!item.read && <span className="unread-dot" aria-label="Непрочитано" />}</Group><Text size="sm" c="dimmed" mt={5}>{item.description}</Text><Text size="xs" c="dimmed" mt={8}>{item.time}</Text></div>{!item.read && <Badge variant="light" size="sm">Новое</Badge>}</Group></div> })}</div> : <EmptyContent title="Уведомлений пока нет" description="Здесь появятся изменения встреч и новые заявки." />}
+    {notifications.length > 0 ? <div className="notification-feed">{notifications.map((item) => { const Icon = item.kind === 'meeting' ? IconCalendarEvent : IconBell; return <div className={`notification-row${item.read ? '' : ' unread'}`} key={item.id}><Group align="flex-start" wrap="nowrap"><div className="activity-icon"><Icon size={19} /></div><div style={{ flex: 1 }}><Group gap="xs"><Text fw={item.read ? 550 : 650}>{item.title}</Text>{!item.read && <span className="unread-dot" aria-label="Непрочитано" />}</Group><Text size="sm" c="dimmed" mt={5}>{item.description}</Text><Text size="xs" c="dimmed" mt={8}>{item.time}</Text></div>{!item.read && <Button variant="subtle" size="xs" onClick={() => { void markNotificationRead(item.id) }}>Прочитано</Button>}</Group></div> })}</div> : <EmptyContent title="Уведомлений пока нет" description="Здесь появятся изменения встреч и новые заявки." />}
   </Stack>
 }
 
 export function Settings() {
   const navigate = useNavigate()
+  const { roles } = useUserGateway()
+  const { departMentor } = useAssignmentGateway()
+  const [confirmDeparture, setConfirmDeparture] = useState(false)
+  const [departing, setDeparting] = useState(false)
   return <Stack gap="xl">
-    <PageHeader eyebrow="Аккаунт" title="Настройки" description="Демонстрационный режим и параметры интерфейса." />
+    <PageHeader eyebrow="Аккаунт" title="Настройки" description="Аккаунт, уведомления и параметры интерфейса." />
     <Surface><Group gap="md"><div className="icon-tile"><IconUser size={20} /></div><div><Title order={3}>Аккаунт</Title><Text size="sm" c="dimmed">Email и часовой пояс редактируются в профиле</Text></div></Group><Divider my="lg" /><Button variant="light" onClick={() => navigate('/profile')}>Открыть профиль</Button></Surface>
-    <Surface><Group gap="md"><div className="icon-tile"><IconBell size={20} /></div><div><Title order={3}>Уведомления на сайте</Title><Text size="sm" c="dimmed">Изменения встреч и новые заявки появляются в локальной истории. Email и Telegram не используются.</Text></div></Group><Divider my="lg" /><Button variant="light" onClick={() => navigate('/notifications')}>Открыть уведомления</Button></Surface>
+    <Surface><Group gap="md"><div className="icon-tile"><IconBell size={20} /></div><div><Title order={3}>Уведомления</Title><Text size="sm" c="dimmed">События сохраняются на сайте. Напоминания о подтверждённых встречах отправляются за 60 и 5 минут.</Text></div></Group><Divider my="lg" /><TelegramConnection /><Button variant="subtle" mt="md" onClick={() => navigate('/notifications')}>Открыть уведомления</Button></Surface>
+    {roles.includes('mentor') && <Surface><Title order={3}>Завершить работу наставником</Title><Text c="dimmed" size="sm" my="md">Активные назначения завершатся. Ученики смогут выбрать другого наставника, история встреч и заметок сохранится. Самостоятельно отменить это действие нельзя.</Text><Button color="red" variant="light" onClick={() => setConfirmDeparture(true)}>Прекратить наставничество</Button></Surface>}
+    <Dialog opened={confirmDeparture} onClose={() => setConfirmDeparture(false)} title="Прекратить наставничество?" centered><Stack><Text size="sm">Все ваши активные назначения будут завершены. Это не удалит историю.</Text><Button color="red" loading={departing} onClick={async () => { setDeparting(true); const saved = await departMentor(); setDeparting(false); if (saved) setConfirmDeparture(false) }}>Подтвердить завершение</Button></Stack></Dialog>
     <Surface><Group gap="md"><div className="icon-tile"><IconPalette size={20} /></div><div style={{ flex: 1 }}><Title order={3}>Интерфейс</Title><Text size="sm" c="dimmed">Светлая тема</Text></div><Badge variant="light" leftSection={<IconCheck size={14} />}>Активна</Badge></Group><Text size="sm" c="dimmed" mt="lg">Системные настройки reduced motion, reduced transparency и повышенного контраста учитываются автоматически.</Text></Surface>
   </Stack>
 }

@@ -12,17 +12,26 @@ from src.models import (
     MentorAssignment,
     Notification,
     NotificationDelivery,
+    TelegramConnection,
     User,
 )
 from src.services import reminders
 
 
 @pytest.mark.asyncio
-async def test_reminders_are_not_sent_twice(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_reminders_are_not_sent_twice(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     sent: list[str] = []
     monkeypatch.setattr(
         reminders, "send_email", lambda address, _subject, _body: sent.append(address)
     )
+    monkeypatch.setattr(get_settings(), "telegram_bot_token", "test-only-token")
+
+    def failed_telegram(_chat: str, _body: str) -> None:
+        raise RuntimeError("test-only-token must never be logged")
+
+    monkeypatch.setattr(reminders, "send_telegram", failed_telegram)
     engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
     try:
         async with engine.connect() as connection:
@@ -45,6 +54,12 @@ async def test_reminders_are_not_sent_twice(monkeypatch: pytest.MonkeyPatch) -> 
                 )
                 db.add_all([student, mentor])
                 await db.flush()
+                db.add_all(
+                    [
+                        TelegramConnection(user_id=student.id, chat_id="test-student"),
+                        TelegramConnection(user_id=mentor.id, chat_id="test-mentor"),
+                    ]
+                )
                 assignment = MentorAssignment(
                     id=uuid.uuid4(), student_id=student.id, mentor_id=mentor.id, status="active"
                 )
@@ -84,8 +99,10 @@ async def test_reminders_are_not_sent_twice(monkeypatch: pytest.MonkeyPatch) -> 
                         Notification.user_id.in_([student.id, mentor.id])
                     )
                 )
-                assert deliveries == 4
+                assert deliveries == 8
                 assert notifications == 4
+                assert "reminder_delivery_failed channel=telegram" in caplog.text
+                assert "test-only-token" not in caplog.text
             await transaction.rollback()
     finally:
         await engine.dispose()

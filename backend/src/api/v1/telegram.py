@@ -22,6 +22,7 @@ class ConnectionStatus(BaseModel):
 
 class TelegramChat(BaseModel):
     id: int
+    type: str = "private"
 
 
 class TelegramMessage(BaseModel):
@@ -58,6 +59,6 @@ async def webhook(
     if not secrets.compare_digest(expected, x_telegram_bot_api_secret_token):
         raise HTTPException(403, "Неверный webhook secret")
     message = data.message
-    if message and message.text.startswith("/start "):
+    if message and message.chat.type == "private" and message.text.startswith("/start "):
         token = message.text.removeprefix("/start ").strip()
         await telegram_service.connect_from_start(db, token, str(message.chat.id))

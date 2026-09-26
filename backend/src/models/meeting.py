@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
-from sqlalchemy.orm import Mapped, mapped_column, synonym
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, select, text
+from sqlalchemy.orm import Mapped, column_property, mapped_column, synonym
 
 from src.core.database import Base
 from src.models.common import Timestamps, UUIDPrimaryKey
+from src.models.user import User
 
 
 class Meeting(UUIDPrimaryKey, Timestamps, Base):
@@ -27,6 +28,12 @@ class Meeting(UUIDPrimaryKey, Timestamps, Base):
     slot_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("availability_slots.id"), index=True)
     student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     mentor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    student_name: Mapped[str] = column_property(
+        select(User.name).where(User.id == student_id).scalar_subquery()
+    )
+    mentor_name: Mapped[str] = column_property(
+        select(User.name).where(User.id == mentor_id).scalar_subquery()
+    )
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     duration_minutes: Mapped[int]
     status: Mapped[str] = mapped_column(String(20), default="pending")

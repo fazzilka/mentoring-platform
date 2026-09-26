@@ -96,7 +96,7 @@ export function createDemoState(): DemoState {
       studentLevel: 'Junior', studentDirection: 'Backend', studentGoal: 'Стать уверенным Python-разработчиком',
       studentTechnologies: 'Python, FastAPI, PostgreSQL', studentLearning: 'Архитектура API и тестирование',
       mentorAbout: 'Помогаю начинающим разработчикам разобраться в Python и сервисах.',
-      mentorSpecialization: 'Backend', mentorSkills: 'Python, SQL, Docker', mentorExperience: '5 лет',
+      mentorSpecialization: 'Backend', mentorSkills: 'Python, SQL, Docker', mentorExperience: '5',
       mentorCompany: 'Продуктовая команда', mentorPosition: 'Backend Engineer', telemostUrl: 'https://telemost.yandex.ru/',
     },
     mentors, students, meetings, availability,
