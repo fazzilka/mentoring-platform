@@ -1,9 +1,7 @@
 import type { AppMode, AppNotification, AvailabilitySlot, Meeting, Mentor, MentorAssignment, ProfileDraft, Reflection, Student, StudentScenario, MeetingAudience, MeetingStatus, TimeSlot } from './index'
-import type { Credentials, Registration } from './user/types'
 import type { AvailabilityInput } from './availability/types'
 
 export interface PlatformData {
-  loggedIn: boolean
   mode: AppMode
   profile: ProfileDraft
   mentors: Mentor[]
@@ -36,9 +34,6 @@ export type PlatformSnapshot = Omit<PlatformData, 'assignments'> & {
   saveReflection: (id: string, author: MeetingAudience, summary: string, nextStep?: string) => Promise<boolean>
   saveProfile: (profile: ProfileDraft) => Promise<boolean>
   markAllNotificationsRead: () => Promise<boolean>
-  login: (credentials: Credentials) => Promise<void>
-  register: (data: Registration) => Promise<void>
-  logout: () => Promise<void>
   dismissNotice: () => void
 }
 

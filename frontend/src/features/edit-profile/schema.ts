@@ -24,4 +24,6 @@ export const profileSchema = z.object({
     try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'telemost.yandex.ru' && !url.username }
     catch { return false }
   }, 'Укажите HTTPS-ссылку на Телемост'),
+}).refine(profile => `${profile.firstName} ${profile.lastName}`.trim().length <= 160, {
+  message: 'Полное имя не должно превышать 160 символов', path: ['lastName'],
 })

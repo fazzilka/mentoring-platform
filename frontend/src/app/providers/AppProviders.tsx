@@ -4,11 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { GatewayProvider } from './GatewayProvider'
 import { theme } from '../theme'
+import { AuthProvider } from '../auth/AuthProvider'
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return <MantineProvider theme={theme} defaultColorScheme="light">
     <MotionConfig reducedMotion="user">
-      <BrowserRouter><GatewayProvider>{children}</GatewayProvider></BrowserRouter>
+      <BrowserRouter><AuthProvider><GatewayProvider>{children}</GatewayProvider></AuthProvider></BrowserRouter>
     </MotionConfig>
   </MantineProvider>
 }

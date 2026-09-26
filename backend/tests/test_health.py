@@ -14,7 +14,7 @@ async def test_health() -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_frontend_origin_accepts_loopback_alias() -> None:
+async def test_cors_only_accepts_configured_origin() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.options(
@@ -25,5 +25,5 @@ async def test_local_frontend_origin_accepts_loopback_alias() -> None:
             },
         )
 
-    assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers

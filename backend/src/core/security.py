@@ -9,15 +9,16 @@ from pwdlib import PasswordHash
 from src.core.config import get_settings
 
 password_hash = PasswordHash.recommended()
-local_secret = secrets.token_urlsafe(48)
 
 
 def jwt_secret() -> str:
     settings = get_settings()
-    if settings.jwt_secret and not settings.jwt_secret.startswith("replace-with-"):
+    if (
+        settings.jwt_secret
+        and len(settings.jwt_secret) >= 32
+        and not settings.jwt_secret.startswith("replace-with-")
+    ):
         return settings.jwt_secret
-    if settings.environment == "local":
-        return local_secret
     raise RuntimeError("JWT_SECRET must be set to a strong secret")
 
 

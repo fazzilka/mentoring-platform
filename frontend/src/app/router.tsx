@@ -1,4 +1,5 @@
 import { DataPage } from './DataPage'
+import { ProtectedRoute } from './auth/AuthProvider'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './layouts/AppLayout'
 import { Login, NotFound, Register } from '../pages/AuthPages'
@@ -20,6 +21,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route element={<ProtectedRoute />}>
       <Route element={<AppLayout />}>
         <Route index element={<Navigate to="/student/dashboard" replace />} />
         <Route path="/student/dashboard" element={<DataPage mode="student"><StudentDashboard /></DataPage>} />
@@ -37,6 +39,7 @@ export default function App() {
         <Route path="/profile" element={<DataPage><Profile /></DataPage>} />
         <Route path="/notifications" element={<DataPage><Notifications /></DataPage>} />
         <Route path="/settings" element={<DataPage><Settings /></DataPage>} />
+      </Route>
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

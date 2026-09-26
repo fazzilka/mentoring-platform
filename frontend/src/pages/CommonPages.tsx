@@ -17,17 +17,26 @@ export function Profile() {
   const { profile, roles } = useUserGateway()
   const { saveProfile } = useEditProfile()
   const [draft, setDraft] = useState<ProfileDraft>(profile)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const save = async () => {
+    setSaving(true)
+    setSaveError('')
+    try { await saveProfile(draft) } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Не удалось сохранить профиль') }
+    finally { setSaving(false) }
+  }
   const errors = formErrors(profileSchema, draft)
   const setField = (field: keyof ProfileDraft, value: string) => setDraft((current) => ({ ...current, [field]: value }))
   useEffect(() => setDraft(profile), [profile])
 
   return <Stack gap="xl">
-    <PageHeader eyebrow="Аккаунт" title="Профиль" description="Общие данные и профили для ваших ролей." action={<Button leftSection={<IconDeviceFloppy size={17} />} onClick={() => saveProfile(draft)}>Сохранить изменения</Button>} />
+    <PageHeader eyebrow="Аккаунт" title="Профиль" description="Общие данные и профили для ваших ролей." action={<Button loading={saving} leftSection={<IconDeviceFloppy size={17} />} onClick={save}>Сохранить изменения</Button>} />
+    {saveError && <Alert color="red">{saveError}</Alert>}
     <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
       <Surface><Stack align="center" py="md"><Avatar src={draft.avatarUrl || undefined} size={88} radius="xl">{draft.firstName[0]}{draft.lastName[0]}</Avatar><Title order={3}>{draft.firstName} {draft.lastName}</Title><Text size="sm" c="dimmed">{roles.map((role) => role === 'student' ? 'Ученик' : 'Наставник').join(' и ')}</Text><TextInput w="100%" label="Ссылка на аватар" placeholder="https://..." error={errors.avatarUrl} value={draft.avatarUrl} onChange={(event) => setField('avatarUrl', event.currentTarget.value)} /></Stack></Surface>
       <div className="span-two"><Surface><Title order={3}>Основная информация</Title><SimpleGrid cols={{ base: 1, sm: 2 }} mt="lg"><TextInput label="Имя" error={errors.firstName} value={draft.firstName} onChange={(event) => setField('firstName', event.currentTarget.value)} /><TextInput label="Фамилия" error={errors.lastName} value={draft.lastName} onChange={(event) => setField('lastName', event.currentTarget.value)} /><TextInput type="email" label="Email" error={errors.email} value={draft.email} onChange={(event) => setField('email', event.currentTarget.value)} /><Select label="Часовой пояс" error={errors.timezone} value={draft.timezone} onChange={(value) => setField('timezone', value ?? draft.timezone)} data={[{ value: 'Europe/Moscow', label: 'Москва · UTC+3' }, { value: 'Asia/Yekaterinburg', label: 'Екатеринбург · UTC+5' }, { value: 'Asia/Novosibirsk', label: 'Новосибирск · UTC+7' }]} /></SimpleGrid></Surface></div>
     </SimpleGrid>
-    <Alert color="indigo" title="Демонстрационный аккаунт">В лабораторной №1 доступны обе роли. Изменения профиля сохраняются только в этом браузере.</Alert>
+    <Alert color="indigo" title="Лабораторная №4">Аккаунт и основные данные сохраняются на сервере. Учебные данные профиля и встречи пока демонстрационные; роли получены с сервера.</Alert>
     <Tabs defaultValue={roles[0]} variant="outline">
       <Tabs.List>{roles.includes('student') && <Tabs.Tab value="student">Профиль ученика</Tabs.Tab>}{roles.includes('mentor') && <Tabs.Tab value="mentor">Профиль наставника</Tabs.Tab>}</Tabs.List>
       {roles.includes('student') && <Tabs.Panel value="student" pt="lg"><Surface><Stack gap="md"><Textarea label="О себе" minRows={3} error={errors.studentAbout} value={draft.studentAbout} onChange={(event) => setField('studentAbout', event.currentTarget.value)} /><SimpleGrid cols={{ base: 1, sm: 2 }}><Select label="Текущий уровень" value={draft.studentLevel || null} onChange={(value) => setField('studentLevel', value ?? '')} data={['Intern', 'Junior', 'Middle', 'Senior']} /><TextInput label="Направление" error={errors.studentDirection} value={draft.studentDirection} onChange={(event) => setField('studentDirection', event.currentTarget.value)} /><TextInput label="Цель" error={errors.studentGoal} value={draft.studentGoal} onChange={(event) => setField('studentGoal', event.currentTarget.value)} /><TextInput label="Технологии через запятую" error={errors.studentTechnologies} value={draft.studentTechnologies} onChange={(event) => setField('studentTechnologies', event.currentTarget.value)} /></SimpleGrid><Textarea label="Что хочу изучить" error={errors.studentLearning} value={draft.studentLearning} onChange={(event) => setField('studentLearning', event.currentTarget.value)} /></Stack></Surface></Tabs.Panel>}

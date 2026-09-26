@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from src.core.config import get_settings
 from src.core.security import (
@@ -37,13 +38,17 @@ async def register(db: AsyncSession, data: RegisterRequest) -> TokenPair:
     if await auth_dao.get_user_by_email(db, data.email.lower()):
         raise HTTPException(409, "Email уже зарегистрирован")
     user = User(
-        name=data.name.strip(), email=data.email.lower(), password_hash=hash_password(data.password)
+        name=data.name.strip(),
+        email=data.email.lower(),
+        password_hash=await run_in_threadpool(hash_password, data.password),
+        first_name=data.name.strip().split()[0],
+        last_name=" ".join(data.name.strip().split()[1:]),
     )
-    db.add(user)
-    await db.flush()
-    await auth_dao.add_role(db, user.id, data.initial_role)
-    tokens = issue_tokens(db, user)
     try:
+        db.add(user)
+        await db.flush()
+        await auth_dao.add_role(db, user.id, data.initial_role)
+        tokens = issue_tokens(db, user)
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -53,7 +58,7 @@ async def register(db: AsyncSession, data: RegisterRequest) -> TokenPair:
 
 async def login(db: AsyncSession, email: str, password: str) -> TokenPair:
     user = await auth_dao.get_user_by_email(db, email.lower())
-    if not user or not verify_password(password, user.password_hash):
+    if not user or not await run_in_threadpool(verify_password, password, user.password_hash):
         raise HTTPException(401, "Неверный email или пароль")
     tokens = issue_tokens(db, user)
     await db.commit()

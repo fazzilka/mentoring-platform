@@ -62,12 +62,12 @@ test('gateway snapshots remain stable until data changes and subscriptions unsub
   assert.equal(gateway.getSnapshot(), gateway.getSnapshot())
   let changes = 0
   const unsubscribe = gateway.subscribe(() => changes++)
-  await gateway.getSnapshot().login({ email: 'oleg@example.ru', password: 'demo-password' })
+  gateway.getSnapshot().setMode('mentor')
   assert.ok(changes > 0)
-  assert.equal(gateway.getSnapshot().loggedIn, true)
+  assert.equal(gateway.getSnapshot().mode, 'mentor')
   unsubscribe()
   const count = changes
-  await gateway.getSnapshot().logout()
+  gateway.getSnapshot().setMode('student')
   assert.equal(changes, count)
 })
 
@@ -103,7 +103,7 @@ test('departure preserves reflections and permits selecting a new mentor', async
 })
 
 test('corrupt nested persistence falls back to a valid demo state', () => {
-  localStorage.setItem('mentoring-lab-01-v1', JSON.stringify({ ...createDemoState(), meetings: [{ status: 'broken' }] }))
+  localStorage.setItem('mentoring-domain-demo:lab-demo', JSON.stringify({ ...createDemoState(), meetings: [{ status: 'broken' }] }))
   assert.ok(createDemoGateway().getSnapshot().meetings.length > 0)
 })
 

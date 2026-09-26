@@ -37,7 +37,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run mypy
       - run: uv run alembic upgrade head
-      - run: uv run pytest
+      - run: JWT_SECRET="$(uv run python -c 'import secrets; print(secrets.token_urlsafe(48))')" uv run pytest
 
   frontend:
     runs-on: ubuntu-latest

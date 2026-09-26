@@ -6,9 +6,9 @@
 
 **«Интерфейс приложения и каркас frontend».**
 
-Frontend работает только на mock/demo-данных, без запросов к backend domain API. Изменения выполняются в demo adapter и сохраняются в localStorage. После Lab 3 интерфейс получает данные через узкие gateways, подключённые через React Context. Вход и регистрация имитируются, пароли не сохраняются — это не настоящая авторизация.
+Lab 1 реализовала интерфейс на mock/demo-данных. После Lab 3 domain-данные поступают через узкие gateways и сохраняются в localStorage. В текущей Lab 4 вход, регистрация и основные данные аккаунта подключены к backend; встречи, наставники и остальные учебные данные ещё демонстрационные.
 
-В репозитории присутствует backend предыдущего этапа. Он не изменяется в рамках Lab 1. Для демонстрации frontend не нужны backend, база данных и Docker.
+Для текущего frontend нужны backend и PostgreSQL. Порядок запуска описан в разделе «Лабораторная работа №4» ниже.
 
 ### Запуск
 
@@ -20,7 +20,7 @@ npm ci
 npm run dev
 ```
 
-Откройте <http://localhost:5173> и нажмите «Войти в демо». Можно также ввести любой корректный email и пароль от 8 символов или пройти demo-регистрацию. Обе роли доступны сразу; начальная роль при регистрации определяет первый экран.
+Откройте <http://localhost:5173> и зарегистрируйте аккаунт. Пароль — от 8 символов. Доступна только выбранная роль; обе роли доступны только пользователю, которому обе назначены в БД.
 
 Если порт занят: `npm run dev -- --port 5176`.
 
@@ -76,7 +76,7 @@ frontend/
 
 `app/adapters/demo/data.ts` создаёт четырёх наставников, трёх учеников, встречи разных статусов, историю назначений, свободные и занятые слоты, уведомления, reflections и профили обеих ролей. Централизованный demo gateway управляет данными; каждый экран подписывается только на нужные ему domain gateways.
 
-Данные хранятся в текущем браузере под ключом `mentoring-lab-01-v1`. Для сброса удалите этот ключ через DevTools → Application → Local Storage и перезагрузите страницу. Если localStorage недоступен, приложение работает без сохранения после reload.
+Демонстрационные domain-данные хранятся в браузере под ключом `mentoring-domain-demo:<user-id>`. Для сброса удалите этот ключ через DevTools → Application → Local Storage и перезагрузите страницу. Это не сбрасывает серверную auth-сессию: для неё используйте «Выйти». Если localStorage недоступен, demo-данные не сохраняются после reload.
 
 ### Дизайн и responsive
 
@@ -177,23 +177,23 @@ uv run uvicorn src.main:app --reload --port 8003
 
 По умолчанию PostgreSQL доступен на `localhost:5432`, database/user — `mentoring`; параметры локального окружения описаны в `backend/.env.example`. Для другой базы задайте `DATABASE_URL` или используйте свой локальный `backend/.env` (не коммитить). Swagger: <http://localhost:8003/docs>, health: <http://localhost:8003/health> → `{"status":"ok"}`.
 
-### Временный current-user stub
+### Идентификация пользователя
 
-Полноценная авторизация отложена до Lab 4. В Lab 2 заголовок `X-Development-User-Id` явно выбирает существующего пользователя в `api/v1/development.py`. Он **не удостоверяет личность**, разрешён только при `ENVIRONMENT=local` или `test` и не подходит для публичного deployment. При замене на настоящую auth достаточно заменить `CurrentUserDep`; сервисы не знают о заголовке.
+В Lab 2 использовался временный `X-Development-User-Id`. В Lab 4 этот механизм удалён: все domain endpoints требуют JWT и действующую AuthSession. Подстановка чужого UUID в заголовок не даёт доступа.
 
 Seed создаёт двух пользователей с профилями и случайными, не публикуемыми password_hash; пароли для входа не выдаются. Повторный запуск не создаёт дублей и не перезаписывает пользовательские изменения:
 
 - Student: `11111111-1111-4111-8111-111111111111`.
 - Mentor: `22222222-2222-4222-8222-222222222222`.
 
-В Swagger укажите UUID в поле заголовка каждого domain endpoint. Например:
+После входа укажите access token через Swagger Authorize. Например:
 
 ```bash
 curl http://localhost:8003/api/v1/mentors \
-  -H 'X-Development-User-Id: 11111111-1111-4111-8111-111111111111'
+  -H 'Authorization: Bearer <access-token>'
 ```
 
-JWT/refresh и Telegram endpoints прежнего этапа не подключены к приложению Lab 2. Существующие файлы более поздних лабораторных сохранены, но в этой работе не развиваются. Не запускайте Celery worker/beat для демонстрации Lab 2; достаточно PostgreSQL и uvicorn. Email, Telegram и Celery reminders не участвуют в domain API Lab 2.
+Auth endpoints подключены в Lab 4. Telegram endpoints не подключены. Для лабораторных достаточно PostgreSQL и uvicorn: не запускайте Celery worker/beat. Email, Telegram и Celery reminders в текущей работе не используются.
 
 ### API и бизнес-правила
 
@@ -212,7 +212,7 @@ JWT/refresh и Telegram endpoints прежнего этапа не подклю�
 
 Request: слот free → pending, встреча pending. Confirm: встреча confirmed, слот booked, текущий `default_meeting_url` копируется в `meeting_url`. Reject допускается только для pending, переводит встречу в cancelled и освобождает будущий слот. Cancel не удаляет встречу и также освобождает слот, если его время ещё не наступило. Completed допустим только после окончания confirmed-встречи. Перенос — отмена и новая запись; отдельного reschedule endpoint нет. Удаление встреч, назначений и reflections не предусмотрено, чтобы не терять историю.
 
-Ошибки: `400` — неверный бизнес-ввод/нет development header, `403` — недостаточные права, `404` — запись отсутствует или недоступна пользователю, `409` — конфликт состояния, `422` — ошибка Pydantic-валидации. `401` появится с реальной auth в Lab 4.
+Ошибки: `400` — неверный бизнес-ввод, `401` — отсутствующая/недействительная auth-сессия, `403` — недостаточные права, `404` — запись отсутствует или недоступна пользователю, `409` — конфликт состояния, `422` — ошибка Pydantic-валидации.
 
 ### Миграции и тесты
 
@@ -241,7 +241,7 @@ Downgrade новой ревизии запрещён при наличии по�
 
 ## Лабораторная работа №3
 
-**«Архитектура frontend и динамический интерфейс».** Все сценарии Lab 1 сохранены. Backend Lab 2 не подключён: никаких domain API запросов, JWT или доставки внешних уведомлений.
+**«Архитектура frontend и динамический интерфейс».** Все сценарии Lab 1 сохранены. Domain API остаётся демонстрационным адаптером; настоящая auth добавлена отдельно в Lab 4, внешней доставки уведомлений нет.
 
 ### Упрощённый Feature-Sliced подход
 
@@ -261,7 +261,7 @@ Downgrade новой ревизии запрещён при наличии по�
 
 `GatewayProvider` принимает реализацию адаптера и предоставляет восемь узких domain gateways. Например, `useMentorGateway` предоставляет список наставников, `useMeetingGateway` — встречи и их операции. React подписывается через `useSyncExternalStore`; snapshot кэшируется между изменениями. UI больше не импортирует глобальный `usePlatformState` и не знает о localStorage или backend endpoint.
 
-В Lab 5 реализацию адаптера можно заменить на API-backed gateway через параметр `GatewayProvider`, не меняя контракты форм и страниц. Это пока только граница замены, а не реализованный сетевой клиент. Ключ localStorage `mentoring-lab-01-v1` сохранён для совместимости с Lab 1.
+В Lab 5 реализацию адаптера можно заменить на API-backed gateway через параметр `GatewayProvider`, не меняя контракты форм и страниц. В Lab 4 domain demo-state изолирован ключом `mentoring-domain-demo:<user-id>`; в нём нет токенов или признака авторизации.
 
 ### Формы и типы
 
@@ -280,7 +280,7 @@ TypeScript strict сохраняется, `any` не используется. �
 
 При смене маршрута предыдущий результат загрузки не показывается на новом экране. Незавершённая загрузка не обновляет размонтированный экран. Повтор снимает демонстрационный параметр и запускает загрузку заново.
 
-Student/mentor routes проверяют доступность роли и соответствие UI режима. Прямой переход в другой раздел синхронизирует demo-режим с маршрутом, как в Lab 1; при отсутствии роли происходит redirect. Это навигационные guards, **не настоящая авторизация**. Вход по-прежнему имитируется.
+Student/mentor routes проверяют доступность роли и соответствие UI режима. Прямой переход синхронизирует UI mode с маршрутом; при отсутствии роли происходит redirect. После Lab 4 ProtectedRoute проверяет AuthProvider, а roles берутся из `/auth/me`. Настоящие права на данные проверяются backend независимо от UI mode.
 
 ### Дизайн и проверка
 
@@ -298,3 +298,55 @@ npm run build
 Лёгкие unit-тесты: `npm test` — встроенный Node test runner с `tsx` для TypeScript. Проверяются Zod schemas, стабильность snapshot/подписка, назначения, бронирование/отмена, история, persistence, повреждённое хранилище и повтор загрузки.
 
 Проверка вручную: сценарии ученика, поиск/фильтрация/назначение, запрос и отмена встречи, подтверждение/отклонение, доступность, редактирование reflections и профиля, чтение уведомлений, reload и переключение ролей. Дополнительно — состояния `demoView`, invalid form inputs, keyboard focus и Drawer на ширинах 1440/1024/768/390 px. Отдельная тяжёлая e2e-инфраструктура не добавляется.
+
+## Лабораторная работа №4
+
+**«Authentication и authorization».** Настоящие регистрация, вход, восстановление и завершение сессии. Полная интеграция domain API отложена: каталог, назначения, встречи, доступность, заметки и уведомления на frontend остаются demo-данными. Основные данные аккаунта сохраняются через `PUT /auth/me`.
+
+### Запуск
+
+Из корня проекта, в каждом терминале backend задайте один и тот же JWT_SECRET через окружение либо локальный `backend/.env`. Пример генерации (не публикуйте полученное значение):
+
+```bash
+export JWT_SECRET="$(openssl rand -hex 32)"
+docker compose up -d postgres
+cd backend
+uv sync --frozen
+uv run alembic upgrade head
+uv run uvicorn src.main:app --reload --port 8000
+```
+
+В другом терминале:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Открывайте именно <http://localhost:5173>. `FRONTEND_ORIGIN` backend должен точно совпадать с origin браузера: scheme, hostname и port. Для другого backend-порта задайте `BACKEND_URL=http://localhost:8003` при запуске Vite. Vite проксирует `/api` на backend; в production нужен аналогичный same-origin reverse proxy. При прямом доступе можно задать `VITE_API_URL`, но origin должен быть разрешён backend и cookie должны оставаться same-site.
+
+JWT_SECRET обязателен во всех окружениях: минимум 32 символа, без шаблонного значения. Отсутствующий/некорректный секрет останавливает запуск API. Не коммитьте `.env`. В CI создаётся одноразовый тестовый секрет. `ACCESS_TOKEN_MINUTES` по умолчанию 15 (1–60), `REFRESH_TOKEN_DAYS` — 30 (1–90). В production обязательны HTTPS и `ENVIRONMENT=production`: refresh cookie всегда Secure; локально для HTTPS можно включить `REFRESH_COOKIE_SECURE=true`.
+
+### Auth API
+
+Все маршруты имеют существующий префикс `/api/v1`:
+
+| Метод | Маршрут | Назначение |
+|---|---|---|
+| POST | `/auth/register` | name, email, password, initial_role; создаёт аккаунт с одной ролью |
+| POST | `/auth/login` | email + password |
+| POST | `/auth/refresh` | получает refresh только из cookie, ротирует сессию |
+| POST | `/auth/logout` | отзывает текущую cookie-сессию, удаляет cookie; access не нужен |
+| GET | `/auth/me` | аккаунт, роли, основные данные; Bearer JWT |
+| PUT | `/auth/me` | редактирование только собственного аккаунта; роли/id не принимаются |
+
+Пароли хешируются Argon2id. В БД хранится только SHA-256 hash случайного refresh token; `AuthSession` уже создана существующей initial migration. Access JWT содержит sub, sid, iat, exp; каждая защищённая операция проверяет подпись, срок, владельца сессии, срок сессии и отзыв. Refresh ротируется: старая сессия отзывается, повторное использование отклоняется. Logout доступен даже с истёкшим access token. Refresh не возвращается в JSON: только HttpOnly, SameSite=Lax cookie с узким path `/api/v1/auth`. Cookie-операции проверяют Origin; CORS разрешает только `FRONTEND_ORIGIN`. Ответы с токенами и `/auth/me` не кешируются.
+
+Frontend `app/auth` содержит memory-only auth client, AuthProvider и ProtectedRoute. Reload вызывает refresh → me; localStorage не определяет авторизацию и не содержит токенов/пароля. Клиент объединяет параллельные refresh, обновляет access перед истечением и повторяет защищённый запрос один раз после 401. Ошибка восстановления из-за недоступного сервера показывается с повтором. Role switch меняет только UI mode и доступен только для server-side roles; второго User он не создаёт.
+
+Backend независимо проверяет роль и владение профилем, назначением, встречей, доступностью и рефлексией. Student видит только собственные reflections; mentor — reflections участников своих встреч. История назначений не даёт постороннему mentor доступа к чужой встрече. OAuth, email verification, password reset, 2FA и внешняя доставка уведомлений не реализуются.
+
+Проверки: `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy`, `uv run pytest` (JWT_SECRET и отдельная PostgreSQL с миграциями); frontend — `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. Тесты auth проверяют регистрацию, дубликаты email, пароль, cookie/hash, JWT/session expiry, rotation/replay, logout, me, роль, Origin и обязательность секрета. Domain-тесты работают через JWT, без development bypass.
+
+Выбор password hashing и cookie-флагов соответствует рекомендациям [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) и [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html). Это учебный auth foundation, не готовый публичный deployment: rate limiting и аудит безопасности потребуют отдельной работы.
