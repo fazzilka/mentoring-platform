@@ -1,13 +1,17 @@
+import { useUserGateway } from '../entities/user/model'
+import { useMeetingGateway } from '../entities/meeting/model'
+import { useReflectionGateway } from '../entities/reflection/model'
 import { Badge, Button, Group, Stack, Text, Title } from '@mantine/core'
 import { IconLock, IconNotes } from '@tabler/icons-react'
 import { useState } from 'react'
-import { ReflectionForm } from '../shared/components/ReflectionForm'
-import { PageHeader } from '../shared/components/PageHeader'
-import { Surface } from '../shared/components/Surface'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { ReflectionForm } from '../features/write-reflection/ReflectionForm'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { Surface } from '../shared/ui/Surface'
 
 export function NotesPage() {
-  const { mode, meetings, reflections, user } = usePlatformState()
+  const { mode, user } = useUserGateway()
+  const { meetings } = useMeetingGateway()
+  const { reflections } = useReflectionGateway()
   const [meetingId, setMeetingId] = useState<string | null>(null)
   const completed = meetings.filter((meeting) => meeting.status === 'completed' && (mode === 'student' ? meeting.studentId === user?.id : meeting.mentorId === user?.id))
 

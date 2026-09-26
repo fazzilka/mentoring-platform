@@ -1,15 +1,19 @@
+import { useMeetingGateway } from '../entities/meeting/model'
+import { useReflectionGateway } from '../entities/reflection/model'
+import { useStudentGateway } from '../entities/student/model'
 import { Badge, Button, Grid, Group, Stack, Text, Title } from '@mantine/core'
 import { IconArrowLeft, IconCalendarEvent, IconNotes } from '@tabler/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AvatarMark } from '../shared/components/AvatarMark'
-import { MeetingList } from '../shared/components/MeetingList'
-import { PageHeader } from '../shared/components/PageHeader'
-import { Surface } from '../shared/components/Surface'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { AvatarMark } from '../shared/ui/AvatarMark'
+import { MeetingList } from '../features/manage-meeting-request/MeetingList'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { Surface } from '../shared/ui/Surface'
 
 export function StudentDetails() {
   const { studentId } = useParams()
-  const { meetings, reflections, students } = usePlatformState()
+  const { meetings } = useMeetingGateway()
+  const { reflections } = useReflectionGateway()
+  const { students } = useStudentGateway()
   const student = students.find((item) => item.id === studentId)
   const navigate = useNavigate()
   if (!student) return <Stack><PageHeader title="Ученик не найден" /><Button w="fit-content" onClick={() => navigate('/mentor/students')}>К списку учеников</Button></Stack>

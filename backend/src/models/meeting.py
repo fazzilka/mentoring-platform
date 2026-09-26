@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 from src.core.database import Base
 from src.models.common import Timestamps, UUIDPrimaryKey
@@ -11,6 +11,7 @@ from src.models.common import Timestamps, UUIDPrimaryKey
 class Meeting(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "meetings"
     __table_args__ = (
+        CheckConstraint("duration_minutes IN (60, 75, 90)", name="ck_meeting_duration"),
         CheckConstraint(
             "status IN ('pending', 'confirmed', 'completed', 'cancelled')", name="ck_meeting_status"
         ),
@@ -31,3 +32,5 @@ class Meeting(UUIDPrimaryKey, Timestamps, Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     meeting_url: Mapped[str | None] = mapped_column(String(2048))
     cancellation_reason: Mapped[str | None] = mapped_column(String(160))
+    cancelled_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    availability_slot_id = synonym("slot_id")

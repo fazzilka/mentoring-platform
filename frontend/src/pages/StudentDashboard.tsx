@@ -1,16 +1,19 @@
+import { useUserGateway } from '../entities/user/model'
+import { useAssignmentGateway } from '../entities/assignment/model'
+import { useMeetingGateway } from '../entities/meeting/model'
+import { useReflectionGateway } from '../entities/reflection/model'
 import { Alert, Badge, Button, Group, SegmentedControl, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { IconAlertCircle, IconArrowRight, IconCalendarEvent, IconNotes } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
-import { AvatarMark } from '../shared/components/AvatarMark'
-import { EmptyState } from '../shared/components/EmptyState'
-import { MeetingList } from '../shared/components/MeetingList'
-import { PageHeader } from '../shared/components/PageHeader'
-import { Surface } from '../shared/components/Surface'
-import { usePlatformState } from '../features/platform/usePlatformState'
-import type { StudentScenario } from '../shared/types'
+import { AvatarMark } from '../shared/ui/AvatarMark'
+import { EmptyState } from '../shared/ui/EmptyState'
+import { MeetingList } from '../features/manage-meeting-request/MeetingList'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { Surface } from '../shared/ui/Surface'
+import type { StudentScenario } from '../entities'
 
 function StudentProfileCard() {
-  const { profile } = usePlatformState()
+  const { profile } = useUserGateway()
   return (
     <Surface>
       <Group justify="space-between" align="flex-start" gap="xl" wrap="wrap">
@@ -26,7 +29,10 @@ function StudentProfileCard() {
 }
 
 export function StudentDashboard() {
-  const { scenario, setScenario, currentMentor, meetings, reflections, profile, user } = usePlatformState()
+  const { scenario, setScenario, currentMentor } = useAssignmentGateway()
+  const { meetings } = useMeetingGateway()
+  const { reflections } = useReflectionGateway()
+  const { profile, user } = useUserGateway()
   const navigate = useNavigate()
   const upcoming = meetings.filter((meeting) => meeting.studentId === user?.id && ['pending', 'confirmed'].includes(meeting.status)).sort((a, b) => a.startsAt.localeCompare(b.startsAt))
   const latestReflection = reflections.find((item) => item.author === 'student')

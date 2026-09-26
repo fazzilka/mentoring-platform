@@ -1,15 +1,15 @@
+import { useStudentGateway } from '../entities/student/model'
 import { Badge, Button, Group, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconSearch } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AvatarMark } from '../shared/components/AvatarMark'
-import { EmptyContent } from '../shared/components/EmptyContent'
-import { PageHeader } from '../shared/components/PageHeader'
-import { Surface } from '../shared/components/Surface'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { AvatarMark } from '../shared/ui/AvatarMark'
+import { EmptyContent } from '../shared/ui/EmptyContent'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { Surface } from '../shared/ui/Surface'
 
 export function MyStudents() {
-  const { students } = usePlatformState()
+  const { students } = useStudentGateway()
   const [search, setSearch] = useState('')
   const navigate = useNavigate()
   const filtered = useMemo(() => students.filter((student) => `${student.name} ${student.direction} ${student.level} ${student.skills.join(' ')}`.toLowerCase().includes(search.toLowerCase())), [students, search])

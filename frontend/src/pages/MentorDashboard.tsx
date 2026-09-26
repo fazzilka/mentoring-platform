@@ -1,14 +1,18 @@
+import { useMeetingGateway } from '../entities/meeting/model'
+import { useUserGateway } from '../entities/user/model'
+import { useStudentGateway } from '../entities/student/model'
 import { Badge, Button, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { IconArrowRight, IconCalendarEvent, IconClock, IconUsers } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
-import { AvatarMark } from '../shared/components/AvatarMark'
-import { MeetingList } from '../shared/components/MeetingList'
-import { PageHeader } from '../shared/components/PageHeader'
-import { Surface } from '../shared/components/Surface'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { AvatarMark } from '../shared/ui/AvatarMark'
+import { MeetingList } from '../features/manage-meeting-request/MeetingList'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { Surface } from '../shared/ui/Surface'
 
 export function MentorDashboard() {
-  const { meetings, profile, students, user } = usePlatformState()
+  const { meetings } = useMeetingGateway()
+  const { profile, user } = useUserGateway()
+  const { students } = useStudentGateway()
   const navigate = useNavigate()
   const ownMeetings = meetings.filter((meeting) => meeting.mentorId === user?.id)
   const pending = ownMeetings.filter((meeting) => meeting.status === 'pending')

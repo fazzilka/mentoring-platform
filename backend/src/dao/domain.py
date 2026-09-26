@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import (
@@ -125,3 +126,60 @@ async def notifications(db: AsyncSession, user_id: uuid.UUID) -> list[Notificati
             .order_by(Notification.created_at.desc())
         )
     )
+
+
+async def lock_user(db: AsyncSession, user_id: uuid.UUID) -> None:
+    await db.execute(select(User).where(User.id == user_id).with_for_update())
+
+
+async def active_mentor_assignments(
+    db: AsyncSession, mentor_id: uuid.UUID
+) -> list[MentorAssignment]:
+    return list(
+        await db.scalars(
+            select(MentorAssignment).where(
+                MentorAssignment.mentor_id == mentor_id, MentorAssignment.status == "active"
+            )
+        )
+    )
+
+
+async def open_mentor_meetings(db: AsyncSession, mentor_id: uuid.UUID) -> list[Meeting]:
+    return list(
+        await db.scalars(
+            select(Meeting)
+            .where(Meeting.mentor_id == mentor_id, Meeting.status.in_(["pending", "confirmed"]))
+            .with_for_update()
+        )
+    )
+
+
+async def weekly_meeting_count(
+    db: AsyncSession, student_id: uuid.UUID, mentor_id: uuid.UUID, week_start: datetime
+) -> int:
+    return int(
+        await db.scalar(
+            select(func.count(Meeting.id)).where(
+                Meeting.student_id == student_id,
+                Meeting.mentor_id == mentor_id,
+                Meeting.starts_at >= week_start,
+                Meeting.starts_at < week_start + timedelta(days=7),
+                Meeting.status.in_(["pending", "confirmed", "completed"]),
+            )
+        )
+        or 0
+    )
+
+
+async def slot_has_history(db: AsyncSession, slot_id: uuid.UUID) -> bool:
+    return (
+        await db.scalar(select(Meeting.id).where(Meeting.slot_id == slot_id).limit(1)) is not None
+    )
+
+
+async def reflection(db: AsyncSession, reflection_id: uuid.UUID) -> MeetingReflection | None:
+    return await db.get(MeetingReflection, reflection_id, with_for_update=True)
+
+
+async def notification(db: AsyncSession, notification_id: uuid.UUID) -> Notification | None:
+    return await db.get(Notification, notification_id, with_for_update=True)

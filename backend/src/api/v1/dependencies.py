@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.v1.development import development_current_user
 from src.core.database import get_session
 from src.core.security import decode_access_token
 from src.dao import auth as auth_dao
@@ -39,4 +40,4 @@ async def current_user(
     return identity[0]
 
 
-CurrentUserDep = Annotated[User, Depends(current_user)]
+CurrentUserDep = Annotated[User, Depends(development_current_user)]

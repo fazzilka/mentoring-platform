@@ -1,4 +1,10 @@
-import { ActionIcon, Box, Burger, Center, Divider, Drawer, Group, Indicator, Loader, Stack, Text, Tooltip } from '@mantine/core'
+import { RoleSwitch } from '../../features/switch-role/RoleSwitch'
+import { useUserGateway } from '../../entities/user/model'
+import { useAssignmentGateway } from '../../entities/assignment/model'
+import { useSwitchRole } from '../../features/switch-role/model'
+import { useAuthForm } from '../../features/auth-form/model'
+import { useNotificationGateway } from '../../entities/notification/model'
+import { ActionIcon, Box, Burger, Divider, Drawer, Group, Indicator, Stack, Text, Tooltip } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import {
   IconBell, IconCalendarEvent, IconCalendarTime, IconChevronRight, IconLayoutDashboard,
@@ -8,8 +14,7 @@ import type { TablerIcon } from '@tabler/icons-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AppNotice } from '../../shared/components/AppNotice'
-import { usePlatformState } from '../../features/platform/usePlatformState'
+import { AppNotice } from '../ui/AppNotice'
 
 interface NavItem {
   label: string
@@ -18,7 +23,8 @@ interface NavItem {
 }
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
-  const { mode, scenario } = usePlatformState()
+  const { mode } = useUserGateway()
+  const { scenario } = useAssignmentGateway()
   const studentItems: NavItem[] = [
     { label: 'Обзор', path: '/student/dashboard', icon: IconLayoutDashboard },
     scenario === 'active'
@@ -75,46 +81,9 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function RoleSwitch({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
-  const { mode, setMode, roles } = usePlatformState()
-  const navigate = useNavigate()
-  const reduceMotion = useReducedMotion()
-  const options = [{ label: 'Ученик', value: 'student' }, { label: 'Наставник', value: 'mentor' }] as const
-  return (
-    <div className={`role-switch${compact ? ' compact' : ''}`}>
-      {!compact && <Text size="xs" c="dimmed" fw={650} mb={7}>Режим</Text>}
-      <div className="role-segments" role="group" aria-label="Режим приложения">
-        {options.map((option) => (
-          <motion.button
-            type="button"
-            key={option.value}
-            className={`role-segment${mode === option.value ? ' selected' : ''}`}
-            aria-pressed={mode === option.value}
-            disabled={!roles.includes(option.value)}
-            whileTap={reduceMotion ? undefined : { scale: 0.975 }}
-            onClick={() => {
-              setMode(option.value)
-              navigate(`/${option.value}/dashboard`)
-              onNavigate?.()
-            }}
-          >
-            {mode === option.value && (
-              <motion.span
-                className="role-segment-indicator"
-                layoutId={compact ? 'active-role-toolbar' : 'active-role-drawer'}
-                transition={reduceMotion ? { duration: 0.01 } : { type: 'spring', bounce: 0, duration: 0.34 }}
-              />
-            )}
-            <span className="role-segment-label">{option.label}</span>
-          </motion.button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function SidebarContent({ onNavigate, showBrand = true, showRoleSwitch = true }: { onNavigate?: () => void; showBrand?: boolean; showRoleSwitch?: boolean }) {
-  const { user, logout } = usePlatformState()
+  const { user } = useUserGateway()
+  const { logout } = useAuthForm()
   const navigate = useNavigate()
   return (
     <Stack h="100%" gap="xl">
@@ -139,7 +108,9 @@ export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const reduceMotion = useReducedMotion()
-  const { mode, setMode, unreadCount, loggedIn, loading, user, roles } = usePlatformState()
+  const { mode, loggedIn, user, roles } = useUserGateway()
+  const { setMode } = useSwitchRole()
+  const { unreadCount } = useNotificationGateway()
   const pageTitles: Record<string, string> = {
     '/student/dashboard': 'Обзор', '/student/mentors': 'Наставники', '/student/my-mentor': 'Мой ментор',
     '/student/meetings': 'Встречи', '/student/notes': 'Заметки', '/mentor/dashboard': 'Обзор',
@@ -158,7 +129,6 @@ export function AppLayout() {
   }, [location.pathname, mode, setMode])
 
   if (!loggedIn) return <Navigate to="/login" replace />
-  if (loading) return <Center h="100vh"><Loader size="sm" /></Center>
   if (!user) return <Navigate to="/login" replace />
   if (location.pathname.startsWith('/student/') && !roles.includes('student')) return <Navigate to="/mentor/dashboard" replace />
   if (location.pathname.startsWith('/mentor/') && !roles.includes('mentor')) return <Navigate to="/student/dashboard" replace />

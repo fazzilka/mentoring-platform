@@ -3,37 +3,40 @@ from typing import Literal
 from urllib.parse import urlparse
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 
 class OrmResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class StudentProfileUpdate(BaseModel):
-    about: str = Field(max_length=3000)
-    current_level: str = Field(max_length=100)
-    direction: str = Field(max_length=100)
-    learning_goal: str = Field(max_length=3000)
-    technologies: list[str]
-    wants_to_learn: str = Field(max_length=3000)
-    timezone: str = Field(max_length=100)
+class StudentProfileCreate(BaseModel):
+    about: str = Field(default="", max_length=3000)
+    level: str = Field(default="", max_length=100)
+    direction: str = Field(default="", max_length=100)
+    goal: str = Field(default="", max_length=3000)
+    technologies: list[str] = Field(default_factory=list, max_length=50)
+    learning_interests: str = Field(default="", max_length=3000)
 
 
-class StudentProfileResponse(StudentProfileUpdate, OrmResponse):
+class StudentProfileUpdate(StudentProfileCreate):
+    pass
+
+
+class StudentProfileResponse(StudentProfileCreate, OrmResponse):
     user_id: UUID
 
 
-class MentorProfileUpdate(BaseModel):
-    about: str = Field(max_length=3000)
-    specialization: Literal["Backend", "Frontend", "ML", "DevOps"]
-    skills: list[str]
-    experience: str = Field(max_length=3000)
-    company: str = Field(max_length=160)
-    position: str = Field(max_length=160)
-    timezone: str = Field(max_length=100)
-    default_meeting_url: str | None = Field(max_length=2048)
-    accepting_students: bool
+class MentorProfileCreate(BaseModel):
+    about: str = Field(default="", max_length=3000)
+    specialization: Literal["Backend", "Frontend", "ML", "DevOps"] = "Backend"
+    skills: list[str] = Field(default_factory=list, max_length=50)
+    experience_years: int = Field(default=0, ge=0, le=100)
+    company: str = Field(default="", max_length=160)
+    position: str = Field(default="", max_length=160)
+    default_meeting_url: str | None = Field(default=None, max_length=2048)
+    accepting_students: bool = True
+    status: Literal["active", "inactive", "departed"] = "active"
 
     @field_validator("default_meeting_url")
     @classmethod
@@ -41,70 +44,107 @@ class MentorProfileUpdate(BaseModel):
         if value is None:
             return None
         parsed = urlparse(value)
-        if parsed.scheme != "https" or parsed.hostname != "telemost.yandex.ru":
+        if parsed.scheme != "https" or parsed.hostname != "telemost.yandex.ru" or parsed.username:
             raise ValueError("Укажите HTTPS-ссылку на Телемост")
         return value
 
 
-class MentorProfileResponse(MentorProfileUpdate, OrmResponse):
+class MentorProfileUpdate(MentorProfileCreate):
+    pass
+
+
+class MentorProfileResponse(MentorProfileCreate, OrmResponse):
     user_id: UUID
     name: str = ""
     avatar_url: str | None = None
-    status: str
+    timezone: str
+
+
+class AssignmentCreate(BaseModel):
+    mentor_id: UUID
 
 
 class AssignmentResponse(OrmResponse):
     id: UUID
     student_id: UUID
     mentor_id: UUID
-    status: str
-    end_reason: str | None
-    created_at: datetime
+    status: Literal["active", "ended"]
+    started_at: datetime
     ended_at: datetime | None
+    end_reason: str | None
 
 
 class SlotCreate(BaseModel):
-    starts_at: datetime
+    starts_at: AwareDatetime
     duration_minutes: Literal[60, 75, 90]
+
+
+class SlotUpdate(SlotCreate):
+    pass
 
 
 class SlotResponse(SlotCreate, OrmResponse):
     id: UUID
     mentor_id: UUID
-    status: str
+    state: Literal["free", "pending", "booked"]
+    created_at: datetime
 
 
 class MeetingCreate(BaseModel):
-    slot_id: UUID
+    availability_slot_id: UUID
+
+
+class MeetingCancel(BaseModel):
+    reason: str | None = Field(default=None, max_length=160)
 
 
 class MeetingResponse(OrmResponse):
     id: UUID
     student_id: UUID
     mentor_id: UUID
-    slot_id: UUID
+    assignment_id: UUID
+    availability_slot_id: UUID
     starts_at: datetime
-    duration_minutes: int
-    status: str
+    duration_minutes: Literal[60, 75, 90]
+    status: Literal["pending", "confirmed", "completed", "cancelled"]
     meeting_url: str | None
+    cancelled_by: UUID | None
     cancellation_reason: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class ReflectionCreate(BaseModel):
-    text: str = Field(min_length=1, max_length=5000)
+    summary: str = Field(min_length=1, max_length=5000)
+    next_step: str | None = Field(default=None, max_length=3000)
+
+    @field_validator("summary")
+    @classmethod
+    def non_empty_summary(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Заметка не может быть пустой")
+        return value
 
 
-class ReflectionResponse(OrmResponse):
+class ReflectionUpdate(ReflectionCreate):
+    pass
+
+
+class ReflectionResponse(ReflectionCreate, OrmResponse):
     id: UUID
     meeting_id: UUID
-    author_user_id: UUID
-    author_role: str
-    text: str
+    author_id: UUID
+    created_at: datetime
+    updated_at: datetime
 
 
 class NotificationResponse(OrmResponse):
     id: UUID
+    user_id: UUID
+    meeting_id: UUID | None
+    type: str
     title: str
-    body: str
-    is_read: bool
+    message: str
+    read_at: datetime | None
     created_at: datetime

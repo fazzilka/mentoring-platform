@@ -1,14 +1,21 @@
-import { Alert, Badge, Button, Grid, Group, Modal, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Dialog } from '../shared/ui/Dialog'
+import { useAssignmentGateway } from '../entities/assignment/model'
+import { useAssignMentor } from '../features/assign-mentor/model'
+import { useAvailabilityGateway } from '../entities/availability/model'
+import { useMentorGateway } from '../entities/mentor/model'
+import { Alert, Badge, Button, Grid, Group, SimpleGrid, Stack, Text, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { IconArrowLeft, IconBriefcase2, IconCheck, IconClock, IconWorld } from '@tabler/icons-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AvatarMark } from '../shared/components/AvatarMark'
-import { PageHeader } from '../shared/components/PageHeader'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { AvatarMark } from '../shared/ui/AvatarMark'
+import { PageHeader } from '../shared/ui/PageHeader'
 
 export function MentorDetails() {
   const { mentorId } = useParams()
-  const { scenario, currentMentor, selectMentor, claimedSlotIds, mentors } = usePlatformState()
+  const { scenario, currentMentor } = useAssignmentGateway()
+  const { selectMentor } = useAssignMentor()
+  const { claimedSlotIds } = useAvailabilityGateway()
+  const { mentors } = useMentorGateway()
   const mentor = mentors.find((item) => item.id === mentorId)
   const navigate = useNavigate()
   const [opened, { open, close }] = useDisclosure(false)
@@ -34,9 +41,9 @@ export function MentorDetails() {
         <Group justify="space-between" mb="lg"><div><Title order={2}>Ближайшее свободное время</Title><Text size="sm" c="dimmed" mt={4}>После выбора наставника эти слоты можно будет запросить</Text></div><IconClock size={22} /></Group>
         {mentor.availableSlots.length > 0 ? <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>{mentor.availableSlots.map((slot) => <div className={`slot-preview${claimedSlotIds.includes(slot.id) ? ' claimed' : ''}`} key={slot.id}><Text className="eyebrow">{slot.dateLabel}</Text><Text fw={650} mt={5}>{slot.time}</Text><Text size="xs" c="dimmed" mt={3}>{slot.duration} минут</Text></div>)}</SimpleGrid> : <Alert color="gray">Наставник пока не добавил свободное время.</Alert>}
       </section>
-      <Modal opened={opened} onClose={close} title="Подтвердите выбор" centered>
+      <Dialog opened={opened} onClose={close} title="Подтвердите выбор" centered>
         <Stack gap="lg"><Group><AvatarMark initials={mentor.initials} color={mentor.avatarColor} /><div><Text fw={650}>{mentor.name}</Text><Text size="sm" c="dimmed">{mentor.specialization} · {mentor.position}</Text></div></Group><Text size="sm">После подтверждения этот наставник станет вашим основным ментором. Самостоятельная смена активного ментора не предусмотрена.</Text><Group justify="flex-end"><Button variant="default" onClick={close}>Отмена</Button><Button onClick={async () => { if (await selectMentor(mentor)) { close(); navigate('/student/my-mentor') } }}>Выбрать наставника</Button></Group></Stack>
-      </Modal>
+      </Dialog>
     </Stack>
   )
 }

@@ -1,16 +1,20 @@
+import { useAssignmentGateway } from '../entities/assignment/model'
+import { useMeetingGateway } from '../entities/meeting/model'
+import { useUserGateway } from '../entities/user/model'
 import { Badge, Button, Grid, Group, Stack, Text, Title } from '@mantine/core'
 import { IconCalendarEvent, IconClock, IconExternalLink, IconWorld } from '@tabler/icons-react'
 import { useNavigate } from 'react-router-dom'
-import { AvatarMark } from '../shared/components/AvatarMark'
-import { EmptyState } from '../shared/components/EmptyState'
-import { MeetingList } from '../shared/components/MeetingList'
-import { PageHeader } from '../shared/components/PageHeader'
-import { SlotPicker } from '../shared/components/SlotPicker'
-import { Surface } from '../shared/components/Surface'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { AvatarMark } from '../shared/ui/AvatarMark'
+import { EmptyState } from '../shared/ui/EmptyState'
+import { MeetingList } from '../features/manage-meeting-request/MeetingList'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { SlotPicker } from '../features/request-meeting/SlotPicker'
+import { Surface } from '../shared/ui/Surface'
 
 export function MyMentor() {
-  const { currentMentor, meetings, user } = usePlatformState()
+  const { currentMentor } = useAssignmentGateway()
+  const { meetings } = useMeetingGateway()
+  const { user } = useUserGateway()
   const navigate = useNavigate()
   if (!currentMentor) return <Stack gap="xl"><PageHeader title="Мой ментор" /><EmptyState /></Stack>
   const mentorMeetings = meetings.filter((meeting) => meeting.studentId === user?.id && meeting.mentorId === currentMentor.id)
