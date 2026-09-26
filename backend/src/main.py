@@ -5,11 +5,12 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from src.api.v1.router import router as api_v1_router
 from src.core.config import get_settings
+from src.core.errors import DomainError
 from src.schemas.health import HealthResponse
 
 settings = get_settings()
@@ -36,6 +37,11 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 app.include_router(api_v1_router)
+
+
+@app.exception_handler(DomainError)
+async def domain_error_handler(request: Request, error: DomainError) -> JSONResponse:
+    return JSONResponse(status_code=error.status_code, content={"detail": error.detail})
 
 
 @app.middleware("http")

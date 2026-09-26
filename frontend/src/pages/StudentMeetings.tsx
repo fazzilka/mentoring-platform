@@ -1,13 +1,17 @@
+import { useAssignmentGateway } from '../entities/assignment/model'
+import { useMeetingGateway } from '../entities/meeting/model'
+import { useUserGateway } from '../entities/user/model'
 import { Button, Group, SegmentedControl, Stack } from '@mantine/core'
 import { IconCalendarPlus } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MeetingList } from '../shared/components/MeetingList'
-import { PageHeader } from '../shared/components/PageHeader'
-import { usePlatformState } from '../features/platform/usePlatformState'
+import { MeetingList } from '../features/manage-meeting-request/MeetingList'
+import { PageHeader } from '../shared/ui/PageHeader'
 
 export function StudentMeetings() {
-  const { scenario, meetings, user } = usePlatformState()
+  const { scenario } = useAssignmentGateway()
+  const { meetings } = useMeetingGateway()
+  const { user } = useUserGateway()
   const [tab, setTab] = useState('upcoming')
   const navigate = useNavigate()
   const ownMeetings = meetings.filter((meeting) => meeting.studentId === user?.id)

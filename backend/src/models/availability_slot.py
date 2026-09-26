@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 from src.core.database import Base
 from src.models.common import Timestamps, UUIDPrimaryKey
@@ -20,3 +20,4 @@ class AvailabilitySlot(UUIDPrimaryKey, Timestamps, Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     duration_minutes: Mapped[int]
     status: Mapped[str] = mapped_column(String(20), default="free")
+    state = synonym("status")

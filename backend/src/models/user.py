@@ -9,6 +9,11 @@ class User(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "users"
 
     name: Mapped[str] = mapped_column(String(160))
+    first_name: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    last_name: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    timezone: Mapped[str] = mapped_column(
+        String(100), default="Europe/Moscow", server_default="Europe/Moscow"
+    )
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     avatar_url: Mapped[str | None] = mapped_column(String(2048))
