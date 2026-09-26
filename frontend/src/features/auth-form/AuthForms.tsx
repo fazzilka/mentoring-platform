@@ -1,10 +1,12 @@
 import { loginSchema, registrationSchema } from './schema'
 import { formErrors } from '../../shared/lib/validation'
+import { parseForm } from '../../shared/lib/validation'
+import { useAuth } from '../../app/auth/AuthProvider'
 import { useAuthForm } from '../../features/auth-form/model'
 import { Alert, Anchor, Button, Group, PasswordInput, SegmentedControl, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconArrowRight, IconMail } from '@tabler/icons-react'
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import type { AppMode } from '../../entities'
 
 function AuthBrand() {
@@ -14,7 +16,8 @@ function AuthBrand() {
 export function Login() {
   const navigate = useNavigate()
   const { login } = useAuthForm()
-  const [email, setEmail] = useState('oleg@example.ru')
+  const auth = useAuth()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -27,7 +30,7 @@ export function Login() {
     setBusy(true)
     setError('')
     try {
-      await login({ email, password })
+      await login(parseForm(loginSchema, { email, password }))
       navigate('/student/dashboard')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось войти')
@@ -36,21 +39,22 @@ export function Login() {
     }
   }
 
+  if (auth.user) return <Navigate to={`/${auth.user.roles[0]}/dashboard`} replace />
   return <div className="auth-page"><form className="auth-panel" onSubmit={submit} noValidate>
     <AuthBrand />
-    <div><Title order={1} ta="center">Рады видеть снова</Title><Text c="dimmed" ta="center" mt={8}>Демо лабораторной №1 — без подключения к серверу</Text></div>
+    <div><Title order={1} ta="center">Рады видеть снова</Title><Text c="dimmed" ta="center" mt={8}>Войдите в свой аккаунт Mentoring</Text></div>
     <Stack gap="md">
       {error && <Alert color="red">{error}</Alert>}
       <TextInput type="email" required label="Email" placeholder="oleg@example.ru" leftSection={<IconMail size={18} />} error={(attempted || Boolean(email)) ? errors.email : undefined} value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
       <PasswordInput required label="Пароль" error={(attempted || Boolean(password)) ? errors.password : undefined} value={password} onChange={(event) => setPassword(event.currentTarget.value)} />
       <Button type="submit" size="md" loading={busy} rightSection={<IconArrowRight size={18} />}>Войти</Button>
-      <Button type="button" variant="default" onClick={async () => { await login({ email: 'oleg@example.ru', password: 'demo-password' }); navigate('/student/dashboard') }}>Войти в демо</Button>
     </Stack>
     <Text ta="center" size="sm" c="dimmed">Нет аккаунта? <Anchor component={Link} to="/register">Зарегистрироваться</Anchor></Text>
   </form></div>
 }
 
 export function Register() {
+  const auth = useAuth()
   const navigate = useNavigate()
   const { register } = useAuthForm()
   const [name, setName] = useState('')
@@ -68,7 +72,7 @@ export function Register() {
     setBusy(true)
     setError('')
     try {
-      await register({ name, email, password, initial_role: role })
+      await register(parseForm(registrationSchema, { name, email, password, initial_role: role }))
       navigate(`/${role}/dashboard`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Не удалось зарегистрироваться')
@@ -77,9 +81,10 @@ export function Register() {
     }
   }
 
+  if (auth.user) return <Navigate to={`/${auth.user.roles[0]}/dashboard`} replace />
   return <div className="auth-page"><form className="auth-panel wide" onSubmit={submit} noValidate>
     <AuthBrand />
-    <div><Title order={1} ta="center">Создайте аккаунт</Title><Text c="dimmed" ta="center" mt={8}>Демо-регистрация: данные остаются в браузере, обе роли доступны сразу</Text></div>
+    <div><Title order={1} ta="center">Создайте аккаунт</Title><Text c="dimmed" ta="center" mt={8}>Выберите начальную роль для своего аккаунта</Text></div>
     <Stack gap="md">
       {error && <Alert color="red">{error}</Alert>}
       <TextInput required label="Имя" error={(attempted || Boolean(name)) ? errors.name : undefined} value={name} onChange={(event) => setName(event.currentTarget.value)} />

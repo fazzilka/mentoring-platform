@@ -1,5 +1,3 @@
-import { parseForm } from '../../../shared/lib/validation'
-import { loginSchema, registrationSchema } from '../../../features/auth-form/schema'
 import { profileSchema } from '../../../features/edit-profile/schema'
 import { availabilitySchema } from '../../../features/manage-availability/schema'
 import { reflectionSchema } from '../../../features/write-reflection/schema'
@@ -9,12 +7,10 @@ import { demoStateSchema } from './storage'
 import { appModes } from '../../../entities/user/types'
 import type { AvailabilityInput } from '../../../entities/availability/types'
 import type { PlatformData as DemoState, PlatformSnapshot, PlatformGateway } from '../../../entities/gateway'
-import type { Credentials, Registration } from '../../../entities/user/types'
 import type { AppMode, AppNotification, MeetingAudience, MeetingStatus, Mentor, ProfileDraft, StudentScenario, TimeSlot } from '../../../entities'
-const storageKey = 'mentoring-lab-01-v1'
 const demoRoles: AppMode[] = [...appModes]
 
-function loadState(): DemoState {
+function loadState(storageKey: string): DemoState {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
     const result = demoStateSchema.safeParse(value)
@@ -29,8 +25,9 @@ function notification(title: string, description: string, kind: AppNotification[
   return { id: crypto.randomUUID(), title, description, kind, read: false, time: 'Только что' }
 }
 
-export function createDemoGateway(): PlatformGateway {
-  let state = loadState()
+export function createDemoGateway(owner = 'lab-demo'): PlatformGateway {
+  const storageKey = `mentoring-domain-demo:${owner}`
+  let state = loadState(storageKey)
   let notice: string | null = null
   let noticeIsError = false
   const listeners = new Set<() => void>()
@@ -204,17 +201,6 @@ export function createDemoGateway(): PlatformGateway {
       setNotice('Уведомления прочитаны')
       return true
     },
-    login: async (credentials: Credentials) => {
-      parseForm(loginSchema, credentials)
-      setState((current) => ({ ...current, loggedIn: true }))
-    },
-    register: async (data: Registration) => {
-      parseForm(registrationSchema, data)
-      const [firstName, ...lastName] = data.name.trim().split(/\s+/)
-      setState((current) => ({ ...current, loggedIn: true, mode: data.initial_role,
-        profile: { ...current.profile, firstName, lastName: lastName.join(' '), email: data.email } }))
-    },
-    logout: async () => setState((current) => ({ ...current, loggedIn: false })),
     dismissNotice: () => setNotice(null),
   }
   return value

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 import jwt
@@ -5,7 +6,6 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.v1.development import development_current_user
 from src.core.database import get_session
 from src.core.security import decode_access_token
 from src.dao import auth as auth_dao
@@ -26,7 +26,12 @@ async def current_user_and_session(
     except (jwt.InvalidTokenError, ValueError, KeyError) as exc:
         raise HTTPException(401, "Недействительный access token") from exc
     auth_session = await auth_dao.get_session(db, session_id)
-    if not auth_session or auth_session.user_id != user_id or auth_session.revoked_at:
+    if (
+        not auth_session
+        or auth_session.user_id != user_id
+        or auth_session.revoked_at
+        or auth_session.expires_at <= datetime.now(UTC)
+    ):
         raise HTTPException(401, "Сессия завершена")
     user = await auth_dao.get_user(db, user_id)
     if not user:
@@ -40,4 +45,4 @@ async def current_user(
     return identity[0]
 
 
-CurrentUserDep = Annotated[User, Depends(development_current_user)]
+CurrentUserDep = Annotated[User, Depends(current_user)]

@@ -89,7 +89,7 @@ export function createDemoState(): DemoState {
     },
   ]
   return {
-    loggedIn: false, mode: 'student',
+    mode: 'student',
     profile: {
       avatarUrl: '', firstName: 'Олег', lastName: 'Митин', email: 'oleg@example.ru', timezone: 'Europe/Moscow',
       studentAbout: 'Изучаю backend-разработку и делаю учебную платформу для наставничества.',

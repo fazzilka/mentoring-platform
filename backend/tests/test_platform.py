@@ -1,17 +1,14 @@
 import uuid
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
-from src.core.config import get_settings
-from src.core.database import get_session
-from src.main import app
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.core.security import create_access_token, hash_token
 from src.models import (
+    AuthSession,
     AvailabilitySlot,
     Meeting,
     MentorAssignment,
@@ -21,33 +18,6 @@ from src.models import (
     UserRole,
 )
 from src.seed import seed_demo_users
-
-
-@pytest.fixture
-async def db() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(get_settings().database_url, poolclass=NullPool)
-    async with engine.connect() as connection:
-        transaction = await connection.begin()
-        factory = async_sessionmaker(
-            bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
-        )
-        async with factory() as session:
-            yield session
-        await transaction.rollback()
-    await engine.dispose()
-
-
-@pytest.fixture
-async def client(db: AsyncSession) -> AsyncIterator[AsyncClient]:
-    async def test_session() -> AsyncIterator[AsyncSession]:
-        yield db
-
-    app.dependency_overrides[get_session] = test_session
-    try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
-            yield http
-    finally:
-        app.dependency_overrides.clear()
 
 
 async def person(db: AsyncSession, role: str, *, both: bool = False) -> User:
@@ -73,11 +43,20 @@ async def person(db: AsyncSession, role: str, *, both: bool = False) -> User:
                 )
             )
     await db.commit()
+    db.add(
+        AuthSession(
+            id=user.id,
+            user_id=user.id,
+            refresh_token_hash=hash_token(str(user.id)),
+            expires_at=datetime.now(UTC) + timedelta(days=1),
+        )
+    )
+    await db.commit()
     return user
 
 
 def headers(user: User) -> dict[str, str]:
-    return {"X-Development-User-Id": str(user.id)}
+    return {"Authorization": f"Bearer {create_access_token(user.id, user.id)}"}
 
 
 async def assign(client: AsyncClient, student: User, mentor: User) -> str:
@@ -111,25 +90,21 @@ async def request(client: AsyncClient, student: User, slot_id: str) -> str:
     return str(response.json()["id"])
 
 
-async def test_development_identity_is_explicit(
-    client: AsyncClient, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    assert (await client.get("/api/v1/mentors")).status_code == 400
+async def test_development_identity_is_rejected(client: AsyncClient, db: AsyncSession) -> None:
+    assert (await client.get("/api/v1/mentors")).status_code == 401
     assert (
         await client.get("/api/v1/mentors", headers={"X-Development-User-Id": "invalid"})
-    ).status_code == 422
+    ).status_code == 401
     assert (
         await client.get("/api/v1/mentors", headers={"X-Development-User-Id": str(uuid.uuid4())})
-    ).status_code == 404
+    ).status_code == 401
     user = await person(db, "student")
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    get_settings.cache_clear()
-    try:
-        assert (await client.get("/api/v1/mentors", headers=headers(user))).status_code == 403
-    finally:
-        get_settings.cache_clear()
+    assert (
+        await client.get("/api/v1/mentors", headers={"X-Development-User-Id": str(user.id)})
+    ).status_code == 401
     schema = (await client.get("/openapi.json")).json()
-    assert not any("/auth/" in path or "/telegram" in path for path in schema["paths"])
+    assert "/api/v1/auth/login" in schema["paths"]
+    assert not any("/telegram" in path for path in schema["paths"])
 
 
 async def test_catalog_and_profiles(client: AsyncClient, db: AsyncSession) -> None:
@@ -411,6 +386,14 @@ async def test_profile_creation_and_duplicate(client: AsyncClient, db: AsyncSess
     await db.flush()
     db.add_all(
         [UserRole(user_id=user.id, role="student"), UserRole(user_id=user.id, role="mentor")]
+    )
+    db.add(
+        AuthSession(
+            id=user.id,
+            user_id=user.id,
+            refresh_token_hash=hash_token(str(user.id)),
+            expires_at=datetime.now(UTC) + timedelta(days=1),
+        )
     )
     await db.commit()
     for role in ("student", "mentor"):

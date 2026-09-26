@@ -4,7 +4,7 @@ import { useAssignmentGateway } from '../../entities/assignment/model'
 import { useSwitchRole } from '../../features/switch-role/model'
 import { useAuthForm } from '../../features/auth-form/model'
 import { useNotificationGateway } from '../../entities/notification/model'
-import { ActionIcon, Box, Burger, Divider, Drawer, Group, Indicator, Stack, Text, Tooltip } from '@mantine/core'
+import { ActionIcon, Alert, Box, Burger, Divider, Drawer, Group, Indicator, Stack, Text, Tooltip } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import {
   IconBell, IconCalendarEvent, IconCalendarTime, IconChevronRight, IconLayoutDashboard,
@@ -12,7 +12,7 @@ import {
 } from '@tabler/icons-react'
 import type { TablerIcon } from '@tabler/icons-react'
 import { motion, useReducedMotion } from 'motion/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AppNotice } from '../ui/AppNotice'
 
@@ -84,6 +84,10 @@ function AccountLinks({ onNavigate }: { onNavigate?: () => void }) {
 function SidebarContent({ onNavigate, showBrand = true, showRoleSwitch = true }: { onNavigate?: () => void; showBrand?: boolean; showRoleSwitch?: boolean }) {
   const { user } = useUserGateway()
   const { logout } = useAuthForm()
+  const [logoutError, setLogoutError] = useState('')
+  const signOut = async () => {
+    try { await logout(); navigate('/login') } catch { setLogoutError('Не удалось завершить сессию. Попробуйте ещё раз.') }
+  }
   const navigate = useNavigate()
   return (
     <Stack h="100%" gap="xl">
@@ -96,8 +100,9 @@ function SidebarContent({ onNavigate, showBrand = true, showRoleSwitch = true }:
         <Group mt="lg" gap="sm" className="user-chip">
           <div className="user-avatar">{user?.name.split(' ').map((part) => part[0]).slice(0, 2).join('') ?? 'П'}</div>
           <div className="user-copy"><Text size="sm" fw={600}>{user?.name}</Text><Text size="xs" c="dimmed">{user?.email}</Text></div>
-          <Tooltip label="Выйти"><ActionIcon variant="subtle" color="gray" aria-label="Выйти" onClick={async () => { await logout(); navigate('/login') }}><IconLogout size={18} /></ActionIcon></Tooltip>
+          <Tooltip label="Выйти"><ActionIcon variant="subtle" color="gray" aria-label="Выйти" onClick={signOut}><IconLogout size={18} /></ActionIcon></Tooltip>
         </Group>
+        {logoutError && <Alert color="red" mt="sm">{logoutError}</Alert>}
       </div>
     </Stack>
   )

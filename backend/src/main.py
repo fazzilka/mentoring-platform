@@ -1,6 +1,5 @@
 from collections.abc import Awaitable, Callable
 from time import perf_counter
-from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,18 +10,13 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 from src.api.v1.router import router as api_v1_router
 from src.core.config import get_settings
 from src.core.errors import DomainError
+from src.core.security import jwt_secret
 from src.schemas.health import HealthResponse
 
 settings = get_settings()
+jwt_secret()
 app = FastAPI(title=settings.app_name, debug=settings.debug)
-frontend_url = urlsplit(settings.frontend_origin)
 allowed_origins = [settings.frontend_origin]
-if frontend_url.hostname in {"localhost", "127.0.0.1"}:
-    alternate_host = "127.0.0.1" if frontend_url.hostname == "localhost" else "localhost"
-    alternate_origin = f"{frontend_url.scheme}://{alternate_host}"
-    if frontend_url.port is not None:
-        alternate_origin += f":{frontend_url.port}"
-    allowed_origins.append(alternate_origin)
 request_count = Counter(
     "mentoring_http_requests_total", "HTTP requests", ["method", "route", "status"]
 )

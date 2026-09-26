@@ -11,7 +11,7 @@ import type { PlatformData } from '../../../entities/gateway'
 const text = z.string()
 const slot = z.object({ id: text, startsAt: z.iso.datetime({ offset: true }), dateLabel: text, date: text, time: text, duration: durationSchema })
 export const demoStateSchema: z.ZodType<PlatformData> = z.object({
-  loggedIn: z.boolean(), mode: z.enum(appModes), profile: profileSchema,
+  mode: z.enum(appModes), profile: profileSchema,
   mentors: z.array(z.object({ id: text, name: text, initials: text, avatarColor: text,
     about: text, specialization: z.enum(specializations), skills: z.array(text), experience: text,
     company: text, position: text, timezone: text, acceptingStudents: z.boolean(),
