@@ -1,5 +1,6 @@
 import { Dialog } from '../shared/ui/Dialog'
-import { availabilitySchema } from '../features/manage-availability/schema'
+import { createAvailabilitySchema } from '../features/manage-availability/schema'
+import { useUserGateway } from '../entities/user/model'
 import { formErrors } from '../shared/lib/validation'
 import { useAvailabilityGateway } from '../entities/availability/model'
 import { useManageAvailability } from '../features/manage-availability/model'
@@ -15,6 +16,8 @@ const slotLabels = { free: 'Свободно', pending: 'Ожидает подт
 const slotColors = { free: 'teal', pending: 'yellow', booked: 'gray' }
 
 export function Availability() {
+  const { profile } = useUserGateway()
+  const availabilitySchema = createAvailabilitySchema(profile.timezone)
   const { availability } = useAvailabilityGateway()
   const { addAvailability, removeAvailability } = useManageAvailability()
   const [opened, { open, close }] = useDisclosure(false)

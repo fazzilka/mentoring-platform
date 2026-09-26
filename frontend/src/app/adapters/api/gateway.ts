@@ -5,7 +5,7 @@ import type { PlatformData, PlatformGateway, PlatformSnapshot } from '../../../e
 import type { Mentor, ProfileDraft } from '../../../entities'
 import { profileSchema } from '../../../features/edit-profile/schema'
 import { reflectionSchema } from '../../../features/write-reflection/schema'
-import { availabilitySchema } from '../../../features/manage-availability/schema'
+import { createAvailabilitySchema } from '../../../features/manage-availability/schema'
 import { parseForm } from '../../../shared/lib/validation'
 import * as dto from './contracts'
 import { zonedInstant } from '../../../shared/lib/time'
@@ -82,7 +82,7 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
   const mutation = async (operation: () => Promise<unknown>, message: string): Promise<boolean> => {
     try {
       await client.getMutationCache().build(client, { mutationFn: operation }).execute(undefined)
-      await client.invalidateQueries({ queryKey: key })
+      await client.invalidateQueries({ queryKey: key, refetchType: 'none' })
       await client.fetchQuery(options)
       notice = message; noticeIsError = false; publish(); return true
     } catch (error) { notice = error instanceof Error ? error.message : 'Не удалось сохранить изменения'; noticeIsError = true; publish(); return false }
@@ -104,8 +104,9 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
       cancelMeeting: id => mutation(() => write(`/meetings/${id}/cancel`), 'Встреча отменена'),
       updateMeetingStatus: (id, status) => mutation(() => write(`/meetings/${id}/${status === 'confirmed' ? 'confirm' : status === 'completed' ? 'complete' : 'reject'}`), 'Статус встречи изменён'),
       addAvailability: input => mutation(() => {
-        const value = parseForm(availabilitySchema, input)
-        return write('/slots', { starts_at: zonedInstant(value.date, value.time, auth.getSnapshot().user?.timezone ?? user.timezone), duration_minutes: value.duration })
+        const timeZone = auth.getSnapshot().user?.timezone ?? user.timezone
+        const value = parseForm(createAvailabilitySchema(timeZone), input)
+        return write('/slots', { starts_at: zonedInstant(value.date, value.time, timeZone), duration_minutes: value.duration })
       }, 'Свободное время добавлено'),
       removeAvailability: id => mutation(() => write(`/slots/${id}`, undefined, 'DELETE'), 'Слот удалён'),
       saveReflection: (id, author, summary, nextStep) => mutation(() => {

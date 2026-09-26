@@ -9,17 +9,10 @@ class Settings(BaseSettings):
     environment: str = "local"
     debug: bool = False
     database_url: str = "postgresql+asyncpg://mentoring:mentoring@localhost:5432/mentoring"
-    celery_broker_url: str = "amqp://mentoring:mentoring@localhost:5672//"
     jwt_secret: str | None = None
     access_token_minutes: int = Field(default=15, ge=1, le=60)
     refresh_token_days: int = Field(default=30, ge=1, le=90)
     refresh_cookie_secure: bool = False
-    smtp_host: str = "localhost"
-    smtp_port: int = 1025
-    smtp_from: str = "mentoring@localhost"
-    telegram_bot_token: str | None = None
-    telegram_bot_username: str | None = None
-    telegram_webhook_secret: str | None = None
     frontend_origin: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(

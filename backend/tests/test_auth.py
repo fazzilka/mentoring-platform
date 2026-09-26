@@ -11,6 +11,23 @@ from src.core.security import hash_token, jwt_secret
 from src.models import AuthSession, User
 
 
+@pytest.mark.parametrize("session_id", [None, [], {}, 123])
+async def test_malformed_session_claim_is_unauthorized(
+    client: AsyncClient, session_id: object
+) -> None:
+    token = jwt.encode(
+        {
+            "sub": str(uuid.uuid4()),
+            "sid": session_id,
+            "exp": datetime.now(UTC) + timedelta(minutes=1),
+        },
+        jwt_secret(),
+        algorithm="HS256",
+    )
+    response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+
+
 async def register(http: AsyncClient, role: str = "student") -> tuple[str, str]:
     email = f"{uuid.uuid4()}@example.com"
     response = await http.post(

@@ -12,7 +12,6 @@ import { EmptyContent } from '../shared/ui/EmptyContent'
 import { PageHeader } from '../shared/ui/PageHeader'
 import { Surface } from '../shared/ui/Surface'
 import type { ProfileDraft } from '../entities'
-import { TelegramConnection } from '../features/connect-telegram/TelegramConnection'
 import { useAssignmentGateway } from '../entities/assignment/model'
 import { Dialog } from '../shared/ui/Dialog'
 
@@ -51,7 +50,7 @@ export function Notifications() {
   const { notifications, markNotificationRead } = useNotificationGateway()
   const { markAllNotificationsRead } = useMarkNotificationsRead()
   return <Stack gap="xl">
-    <PageHeader eyebrow="Центр событий" title="Уведомления" description="Подтверждения, напоминания и новые заявки." action={<Button variant="subtle" disabled={!notifications.some((item) => !item.read)} onClick={markAllNotificationsRead}>Отметить все как прочитанные</Button>} />
+    <PageHeader eyebrow="Центр событий" title="Уведомления" description="Подтверждения, изменения встреч и новые заявки." action={<Button variant="subtle" disabled={!notifications.some((item) => !item.read)} onClick={markAllNotificationsRead}>Отметить все как прочитанные</Button>} />
     {notifications.length > 0 ? <div className="notification-feed">{notifications.map((item) => { const Icon = item.kind === 'meeting' ? IconCalendarEvent : IconBell; return <div className={`notification-row${item.read ? '' : ' unread'}`} key={item.id}><Group align="flex-start" wrap="nowrap"><div className="activity-icon"><Icon size={19} /></div><div style={{ flex: 1 }}><Group gap="xs"><Text fw={item.read ? 550 : 650}>{item.title}</Text>{!item.read && <span className="unread-dot" aria-label="Непрочитано" />}</Group><Text size="sm" c="dimmed" mt={5}>{item.description}</Text><Text size="xs" c="dimmed" mt={8}>{item.time}</Text></div>{!item.read && <Button variant="subtle" size="xs" onClick={() => { void markNotificationRead(item.id) }}>Прочитано</Button>}</Group></div> })}</div> : <EmptyContent title="Уведомлений пока нет" description="Здесь появятся изменения встреч и новые заявки." />}
   </Stack>
 }
@@ -65,7 +64,7 @@ export function Settings() {
   return <Stack gap="xl">
     <PageHeader eyebrow="Аккаунт" title="Настройки" description="Аккаунт, уведомления и параметры интерфейса." />
     <Surface><Group gap="md"><div className="icon-tile"><IconUser size={20} /></div><div><Title order={3}>Аккаунт</Title><Text size="sm" c="dimmed">Email и часовой пояс редактируются в профиле</Text></div></Group><Divider my="lg" /><Button variant="light" onClick={() => navigate('/profile')}>Открыть профиль</Button></Surface>
-    <Surface><Group gap="md"><div className="icon-tile"><IconBell size={20} /></div><div><Title order={3}>Уведомления</Title><Text size="sm" c="dimmed">События сохраняются на сайте. Напоминания о подтверждённых встречах отправляются за 60 и 5 минут.</Text></div></Group><Divider my="lg" /><TelegramConnection /><Button variant="subtle" mt="md" onClick={() => navigate('/notifications')}>Открыть уведомления</Button></Surface>
+    <Surface><Group gap="md"><div className="icon-tile"><IconBell size={20} /></div><div><Title order={3}>Уведомления на сайте</Title><Text size="sm" c="dimmed">Новые заявки, изменения встреч и завершение наставничества появляются только внутри приложения.</Text></div></Group><Divider my="lg" /><Button variant="light" onClick={() => navigate('/notifications')}>Открыть уведомления</Button></Surface>
     {roles.includes('mentor') && <Surface><Title order={3}>Завершить работу наставником</Title><Text c="dimmed" size="sm" my="md">Активные назначения завершатся. Ученики смогут выбрать другого наставника, история встреч и заметок сохранится. Самостоятельно отменить это действие нельзя.</Text><Button color="red" variant="light" onClick={() => setConfirmDeparture(true)}>Прекратить наставничество</Button></Surface>}
     <Dialog opened={confirmDeparture} onClose={() => setConfirmDeparture(false)} title="Прекратить наставничество?" centered><Stack><Text size="sm">Все ваши активные назначения будут завершены. Это не удалит историю.</Text><Button color="red" loading={departing} onClick={async () => { setDeparting(true); const saved = await departMentor(); setDeparting(false); if (saved) setConfirmDeparture(false) }}>Подтвердить завершение</Button></Stack></Dialog>
     <Surface><Group gap="md"><div className="icon-tile"><IconPalette size={20} /></div><div style={{ flex: 1 }}><Title order={3}>Интерфейс</Title><Text size="sm" c="dimmed">Светлая тема</Text></div><Badge variant="light" leftSection={<IconCheck size={14} />}>Активна</Badge></Group><Text size="sm" c="dimmed" mt="lg">Системные настройки reduced motion, reduced transparency и повышенного контраста учитываются автоматически.</Text></Surface>

@@ -18,7 +18,7 @@ export function StudentDetails() {
   const navigate = useNavigate()
   if (!student) return <Stack><PageHeader title="Ученик не найден" /><Button w="fit-content" onClick={() => navigate('/mentor/students')}>К списку учеников</Button></Stack>
   const studentMeetings = meetings.filter((meeting) => meeting.studentId === student.id)
-  const upcoming = studentMeetings.filter((meeting) => ['pending', 'confirmed'].includes(meeting.status))
+  const upcoming = studentMeetings.filter((meeting) => ['pending', 'confirmed'].includes(meeting.status)).sort((a, b) => a.startsAt.localeCompare(b.startsAt))
   const history = studentMeetings.filter((meeting) => meeting.status === 'completed')
   const notes = reflections.filter((reflection) => history.some((meeting) => meeting.id === reflection.meetingId))
 

@@ -15,4 +15,3 @@ node_modules/
 dist/
 *.log
 .vite/
-celerybeat-schedule*

@@ -107,6 +107,53 @@ async def test_development_identity_is_rejected(client: AsyncClient, db: AsyncSe
     assert not any("/telegram" in path for path in schema["paths"])
 
 
+async def test_external_notification_endpoints_are_absent(client: AsyncClient) -> None:
+    assert (await client.get("/api/v1/telegram/status")).status_code == 404
+    assert (await client.post("/api/v1/telegram/link")).status_code == 404
+    assert (await client.post("/api/v1/telegram/webhook", json={})).status_code == 404
+
+
+async def test_past_request_cannot_be_confirmed(client: AsyncClient, db: AsyncSession) -> None:
+    student = await person(db, "student")
+    mentor = await person(db, "mentor")
+    await assign(client, student, mentor)
+    slot_id = await slot(client, mentor)
+    meeting_id = await request(client, student, slot_id)
+    meeting = await db.get(Meeting, uuid.UUID(meeting_id))
+    assert meeting
+    meeting.starts_at = datetime.now(UTC) - timedelta(hours=2)
+    await db.commit()
+    response = await client.post(f"/api/v1/meetings/{meeting_id}/confirm", headers=headers(mentor))
+    assert response.status_code == 409
+    await db.refresh(meeting)
+    assert meeting.status == "pending"
+
+
+async def test_mentor_timezone_follows_account(client: AsyncClient, db: AsyncSession) -> None:
+    mentor = await person(db, "mentor")
+    student = await person(db, "student")
+    response = await client.put(
+        "/api/v1/auth/me",
+        headers=headers(mentor),
+        json={
+            "first_name": mentor.first_name,
+            "last_name": mentor.last_name,
+            "email": mentor.email,
+            "timezone": "Asia/Novosibirsk",
+        },
+    )
+    assert response.status_code == 200
+    own = await client.get("/api/v1/profiles/mentor/me", headers=headers(mentor))
+    details = await client.get(f"/api/v1/mentors/{mentor.id}", headers=headers(student))
+    catalog = await client.get("/api/v1/mentors", headers=headers(student))
+    assert own.json()["timezone"] == "Asia/Novosibirsk"
+    assert details.json()["timezone"] == "Asia/Novosibirsk"
+    assert (
+        next(item for item in catalog.json() if item["user_id"] == str(mentor.id))["timezone"]
+        == "Asia/Novosibirsk"
+    )
+
+
 async def test_catalog_and_profiles(client: AsyncClient, db: AsyncSession) -> None:
     student = await person(db, "student", both=True)
     mentor = await person(db, "mentor")

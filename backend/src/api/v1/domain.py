@@ -63,7 +63,7 @@ async def save_student_profile(
 @router.get("/profiles/mentor/me", response_model=MentorProfileResponse)
 async def my_mentor_profile(user: CurrentUserDep, service: ProfileDep) -> MentorProfileResponse:
     return MentorProfileResponse.model_validate(await service.mentor_profile(user)).model_copy(
-        update={"name": user.name, "avatar_url": user.avatar_url}
+        update={"name": user.name, "avatar_url": user.avatar_url, "timezone": user.timezone}
     )
 
 
@@ -73,7 +73,9 @@ async def create_mentor_profile(
 ) -> MentorProfileResponse:
     return MentorProfileResponse.model_validate(
         await service.create_mentor_profile(user, MentorProfileData(**data.model_dump()))
-    ).model_copy(update={"name": user.name, "avatar_url": user.avatar_url})
+    ).model_copy(
+        update={"name": user.name, "avatar_url": user.avatar_url, "timezone": user.timezone}
+    )
 
 
 @router.put("/profiles/mentor/me", response_model=MentorProfileResponse)
@@ -82,7 +84,9 @@ async def save_mentor_profile(
 ) -> MentorProfileResponse:
     return MentorProfileResponse.model_validate(
         await service.update_mentor_profile(user, MentorProfileData(**data.model_dump()))
-    ).model_copy(update={"name": user.name, "avatar_url": user.avatar_url})
+    ).model_copy(
+        update={"name": user.name, "avatar_url": user.avatar_url, "timezone": user.timezone}
+    )
 
 
 @router.post("/profiles/mentor/depart", status_code=204)
@@ -99,7 +103,11 @@ async def mentor_catalog(
 ) -> list[MentorProfileResponse]:
     return [
         MentorProfileResponse.model_validate(profile).model_copy(
-            update={"name": person.name, "avatar_url": person.avatar_url}
+            update={
+                "name": person.name,
+                "avatar_url": person.avatar_url,
+                "timezone": person.timezone,
+            }
         )
         for profile, person in await service.catalog(user, search, specialization)
     ]
@@ -111,7 +119,7 @@ async def mentor_details(
 ) -> MentorProfileResponse:
     profile, person = await service.mentor_details(user, mentor_id)
     return MentorProfileResponse.model_validate(profile).model_copy(
-        update={"name": person.name, "avatar_url": person.avatar_url}
+        update={"name": person.name, "avatar_url": person.avatar_url, "timezone": person.timezone}
     )
 
 

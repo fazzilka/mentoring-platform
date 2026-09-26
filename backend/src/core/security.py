@@ -58,4 +58,6 @@ def decode_access_token(token: str) -> tuple[uuid.UUID, uuid.UUID]:
     payload = jwt.decode(
         token, secret, algorithms=["HS256"], options={"require": ["sub", "sid", "exp"]}
     )
+    if not isinstance(payload["sub"], str) or not isinstance(payload["sid"], str):
+        raise jwt.InvalidTokenError("Invalid identity claims")
     return uuid.UUID(payload["sub"]), uuid.UUID(payload["sid"])

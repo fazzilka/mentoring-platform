@@ -79,6 +79,8 @@ class MeetingService:
         if action == "confirm":
             if meeting.status != "pending":
                 raise DomainError(409, "Заявка уже обработана")
+            if meeting.starts_at <= datetime.now(UTC):
+                raise DomainError(409, "Время встречи уже прошло")
             profile = await dao.mentor_profile(self._db, meeting.mentor_id)
             if profile is None or not profile.default_meeting_url:
                 raise DomainError(409, "Укажите ссылку на Телемост в профиле")
