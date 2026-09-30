@@ -60,7 +60,7 @@ function DomainGateways({ children, gateway: supplied }: { children: ReactNode; 
       student: scope(gateway, ['students']),
       assignment: scope(gateway, ['scenario', 'assignment', 'currentMentor', 'departMentor', 'selectMentor']),
       availability: scope(gateway, ['availability', 'claimedSlotIds', 'addAvailability', 'removeAvailability']),
-      meeting: scope(gateway, ['meetings', 'requestMeeting', 'cancelMeeting', 'updateMeetingStatus']),
+      meeting: scope(gateway, ['meetings', 'requestMeeting', 'createMentorMeeting', 'cancelMeeting', 'updateMeetingStatus']),
       reflection: scope(gateway, ['reflections', 'saveReflection']),
       notification: scope(gateway, ['notifications', 'unreadCount', 'markAllNotificationsRead', 'markNotificationRead']),
       feedback: scope(gateway, ['notice', 'noticeIsError', 'dismissNotice']),
@@ -75,6 +75,7 @@ function DomainGateways({ children, gateway: supplied }: { children: ReactNode; 
       profile: { ...domain.profile, ...(auth.user ? {
         firstName: auth.user.first_name, lastName: auth.user.last_name, email: auth.user.email,
         timezone: auth.user.timezone, avatarUrl: auth.user.avatar_url ?? '',
+        telegramUsername: auth.user.telegram_username ?? '', phoneNumber: auth.user.phone_number ?? '',
       } : {}) },
       setMode: (next: typeof mode) => { if (roles.includes(next)) domain.setMode(next) },
     }
