@@ -174,7 +174,6 @@ button:active, .mantine-Button-root:active, .mantine-ActionIcon-root:active { tr
 .empty-state h2 { text-align: center; letter-spacing: -.02em; }
 .empty-icon { width: 52px; height: 52px; border-radius: .875rem; }
 .compact-empty .surface { padding: 2.5rem 1.5rem; border-style: dashed; box-shadow: none; }
-.scenario-panel .surface { background: var(--color-surface-raised); box-shadow: none; }
 .search-input { flex: 1; min-width: 17.5rem; }
 .filter-bar { display: flex; align-items: center; gap: var(--space-3); }
 .readable-text { max-width: 72ch; line-height: 1.7; }
@@ -297,8 +296,6 @@ button:active, .mantine-Button-root:active, .mantine-ActionIcon-root:active { tr
   .slot-button > span { grid-column: 1 / -1; }
   .profile-summary-grid { grid-template-columns: 1fr; gap: var(--space-5); }
   .profile-facts { padding: 0; border-left: 0; }
-  .scenario-panel .mantine-SegmentedControl-root { width: 100%; overflow-x: auto; }
-  .scenario-panel .mantine-SegmentedControl-label { padding-inline: .5rem; font-size: .6875rem; }
   .mantine-Modal-inner { align-items: flex-end; padding: 0; }
   .mantine-Modal-content { max-height: min(88vh, 720px); border-radius: 1rem 1rem 0 0; }
   .mantine-Modal-content::before { content: ''; display: block; width: 34px; height: 4px; margin: 8px auto 0; border-radius: 999px; background: #cdcdc8; }
