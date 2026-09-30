@@ -6,9 +6,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.core.config import get_settings
+from src.config.config import get_settings
+from src.core.db.models import AuthSession, User
 from src.core.security import hash_token, jwt_secret
-from src.models import AuthSession, User
 
 
 @pytest.mark.parametrize("session_id", [None, [], {}, 123])
