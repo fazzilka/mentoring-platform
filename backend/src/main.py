@@ -8,12 +8,12 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
+from src.api.health_schemas import HealthResponse
 from src.api.v1.router import router as api_v1_router
-from src.core.config import get_settings
+from src.config.config import get_settings
 from src.core.errors import DomainError
 from src.core.logging import configure_logging
 from src.core.security import jwt_secret
-from src.schemas.health import HealthResponse
 
 settings = get_settings()
 configure_logging()
