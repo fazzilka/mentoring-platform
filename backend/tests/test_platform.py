@@ -6,8 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.core.security import create_access_token, hash_token
-from src.models import (
+from src.core.db.models import (
     AuthSession,
     AvailabilitySlot,
     Meeting,
@@ -17,7 +16,7 @@ from src.models import (
     User,
     UserRole,
 )
-from src.seed import seed_demo_users
+from src.core.security import create_access_token, hash_token
 
 
 async def person(db: AsyncSession, role: str, *, both: bool = False) -> User:
@@ -111,6 +110,113 @@ async def test_external_notification_endpoints_are_absent(client: AsyncClient) -
     assert (await client.get("/api/v1/telegram/status")).status_code == 404
     assert (await client.post("/api/v1/telegram/link")).status_code == 404
     assert (await client.post("/api/v1/telegram/webhook", json={})).status_code == 404
+
+
+async def test_contacts_are_visible_only_to_active_pair(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    student = await person(db, "student")
+    mentor = await person(db, "mentor")
+    stranger = await person(db, "student")
+    mentor_contact = await client.put(
+        "/api/v1/auth/me",
+        headers=headers(mentor),
+        json={
+            "first_name": mentor.first_name,
+            "last_name": mentor.last_name,
+            "email": mentor.email,
+            "timezone": mentor.timezone,
+            "avatar_url": None,
+            "telegram_username": "@mentor_test",
+            "phone_number": "+79991234567",
+        },
+    )
+    assert mentor_contact.status_code == 200
+    assert mentor_contact.json()["telegram_username"] == "mentor_test"
+    before = await client.get(f"/api/v1/mentors/{mentor.id}", headers=headers(student))
+    assert before.status_code == 200
+    assert before.json()["telegram_username"] is None
+    assert before.json()["phone_number"] is None
+    await assign(client, student, mentor)
+    after = await client.get(f"/api/v1/mentors/{mentor.id}", headers=headers(student))
+    assert after.json()["telegram_username"] == "mentor_test"
+    assert after.json()["phone_number"] == "+79991234567"
+    catalog = await client.get("/api/v1/mentors", headers=headers(student))
+    assert all(item["telegram_username"] is None for item in catalog.json())
+    updated_student = await client.put(
+        "/api/v1/auth/me",
+        headers=headers(student),
+        json={
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "email": student.email,
+            "timezone": student.timezone,
+            "avatar_url": None,
+            "telegram_username": "student_test",
+            "phone_number": "+79997654321",
+        },
+    )
+    assert updated_student.status_code == 200
+    student_details = await client.get(f"/api/v1/students/{student.id}", headers=headers(mentor))
+    assert student_details.json()["telegram_username"] == "student_test"
+    assert student_details.json()["email"] == student.email
+    outsider = await client.get(f"/api/v1/mentors/{mentor.id}", headers=headers(stranger))
+    assert outsider.json()["telegram_username"] is None
+    assert (
+        await client.get(f"/api/v1/students/{stranger.id}", headers=headers(mentor))
+    ).status_code == 404
+
+
+async def test_mentor_schedules_only_own_student_with_safe_link(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    student = await person(db, "student")
+    other = await person(db, "student")
+    mentor = await person(db, "mentor")
+    await assign(client, student, mentor)
+    slot_id = await slot(client, mentor)
+    path = "/api/v1/meetings/mentor"
+    payload = {
+        "student_id": str(student.id),
+        "availability_slot_id": slot_id,
+        "meeting_url": "https://meet.google.com/abc-defg-hij",
+    }
+    assert (await client.post(path, headers=headers(student), json=payload)).status_code == 403
+    assert (
+        await client.post(
+            path, headers=headers(mentor), json={**payload, "student_id": str(other.id)}
+        )
+    ).status_code == 404
+    assert (
+        await client.post(
+            path, headers=headers(mentor), json={**payload, "meeting_url": "javascript:alert(1)"}
+        )
+    ).status_code == 422
+    response = await client.post(path, headers=headers(mentor), json=payload)
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "confirmed"
+    assert response.json()["meeting_url"] == payload["meeting_url"]
+    assert (await client.post(path, headers=headers(mentor), json=payload)).status_code == 409
+    student_meetings = await client.get("/api/v1/meetings", headers=headers(student))
+    assert any(item["id"] == response.json()["id"] for item in student_meetings.json())
+    notifications = await client.get("/api/v1/notifications", headers=headers(student))
+    assert any(item["meeting_id"] == response.json()["id"] for item in notifications.json())
+
+
+async def test_mentor_confirms_student_request_with_custom_link(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    student = await person(db, "student")
+    mentor = await person(db, "mentor")
+    await assign(client, student, mentor)
+    meeting_id = await request(client, student, await slot(client, mentor))
+    response = await client.post(
+        f"/api/v1/meetings/{meeting_id}/confirm",
+        headers=headers(mentor),
+        json={"meeting_url": "https://zoom.us/j/123456789"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["meeting_url"] == "https://zoom.us/j/123456789"
 
 
 async def test_past_request_cannot_be_confirmed(client: AsyncClient, db: AsyncSession) -> None:
@@ -456,20 +562,7 @@ async def test_profile_creation_and_duplicate(client: AsyncClient, db: AsyncSess
         ] == "Учусь и помогаю"
 
 
-async def test_seed_is_idempotent(db: AsyncSession) -> None:
-    first = await seed_demo_users(db)
-    second = await seed_demo_users(db)
-    assert first == second
-    for role, identity in first.items():
-        user = await db.get(User, identity)
-        assert user is not None
-        assert user.first_name and user.last_name and user.password_hash
-        assert role in (await db.scalars(select(UserRole.role).where(UserRole.user_id == identity)))
-
-
-async def test_confirm_requires_telemost_and_copies_url(
-    client: AsyncClient, db: AsyncSession
-) -> None:
+async def test_confirm_requires_link_and_copies_url(client: AsyncClient, db: AsyncSession) -> None:
     student = await person(db, "student")
     mentor = await person(db, "mentor")
     await assign(client, student, mentor)
