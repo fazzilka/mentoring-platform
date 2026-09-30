@@ -7,7 +7,7 @@ import { createApiGateway } from './gateway'
 test('a successful mutation reloads active platform data only once', async () => {
   const user: AuthUser = {
     id: '11111111-1111-4111-8111-111111111111', name: 'Анна Смирнова', email: 'anna@example.com',
-    roles: ['student'], first_name: 'Анна', last_name: 'Смирнова', timezone: 'Europe/Moscow', avatar_url: null,
+    roles: ['student'], first_name: 'Анна', last_name: 'Смирнова', timezone: 'Europe/Moscow', avatar_url: null, telegram_username: null, phone_number: null,
   }
   let loads = 0
   const auth = {
@@ -15,7 +15,7 @@ test('a successful mutation reloads active platform data only once', async () =>
     authorizedRequest: async (path: string): Promise<unknown> => {
       if (path === '/profiles/student/me') {
         loads += 1
-        return { user_id: user.id, about: '', level: '', direction: '', goal: '', technologies: [], learning_interests: '' }
+        return { user_id: user.id, about: '', level: '', direction: '', goal: '', technologies: [], learning_interests: '', email: user.email, telegram_username: null, phone_number: null }
       }
       return []
     },
