@@ -1,14 +1,13 @@
 import asyncio
-from collections.abc import Mapping
 from logging.config import fileConfig
 
-import src.models  # noqa: F401
+import src.core.db.models  # noqa: F401
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from src.core.config import get_settings
-from src.core.database import Base
+from src.config.config import get_settings
+from src.core.db.db import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
@@ -19,27 +18,19 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-def include_name(name: str | None, type_: str, parent_names: Mapping[str, str | None]) -> bool:
-    # Historical delivery tables remain in the database, outside the active application model.
-    return type_ != "table" or name not in {"notification_deliveries", "telegram_connections"}
-
-
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        include_name=include_name,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(
-        connection=connection, target_metadata=target_metadata, include_name=include_name
-    )
+    context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
         context.run_migrations()
