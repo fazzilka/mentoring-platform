@@ -6,7 +6,7 @@ const originalFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = originalFetch })
 const user = {
   id: '11111111-1111-4111-8111-111111111111', name: 'Анна Смирнова', email: 'anna@example.com',
-  roles: ['student'], first_name: 'Анна', last_name: 'Смирнова', timezone: 'Europe/Moscow', avatar_url: null,
+  roles: ['student'], first_name: 'Анна', last_name: 'Смирнова', timezone: 'Europe/Moscow', avatar_url: null, telegram_username: null, phone_number: null,
 }
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
