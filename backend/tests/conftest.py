@@ -4,8 +4,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from src.core.config import get_settings
-from src.core.database import get_session
+from src.config.config import get_settings
+from src.core.db.db import get_session
 from src.main import app
 
 
