@@ -1,4 +1,4 @@
-.PHONY: setup infra-up infra-down migrate seed backend frontend test lint logs
+.PHONY: setup infra-up infra-down migrate backend frontend test lint logs
 
 setup:
 	cd backend && uv sync --frozen
@@ -12,9 +12,6 @@ infra-down:
 
 migrate:
 	cd backend && uv run alembic upgrade head
-
-seed:
-	docker compose exec -e DEMO_PASSWORD backend python -m src.seed
 
 backend:
 	cd backend && uv run uvicorn src.main:app --reload --port 8000
