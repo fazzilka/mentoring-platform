@@ -7,10 +7,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from src.core.config import get_settings
-from src.core.database import get_session
-from src.main import app
-from src.models import (
+from src.config.config import get_settings
+from src.core.db.db import get_session
+from src.core.db.models import (
     AuthSession,
     AvailabilitySlot,
     Meeting,
@@ -21,6 +20,7 @@ from src.models import (
     User,
     UserRole,
 )
+from src.main import app
 
 from tests.test_platform import headers, person
 
