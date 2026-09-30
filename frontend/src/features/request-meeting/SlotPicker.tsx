@@ -44,7 +44,7 @@ export function SlotPicker({ mentor }: { mentor: Mentor }) {
                 <Group justify="space-between"><Text c="dimmed" size="sm">Продолжительность</Text><Text fw={650}>{selected.duration} минут</Text></Group>
               </Stack>
             </Surface>
-            <Text size="sm" c="dimmed">Наставник получит заявку и подтвердит встречу. Ссылка на Телемост появится после подтверждения.</Text>
+            <Text size="sm" c="dimmed">Наставник получит заявку и подтвердит встречу. Ссылка для подключения появится после подтверждения.</Text>
             <Radio checked readOnly label={`Время показано в вашем часовом поясе (${profile.timezone})`} />
             <Group justify="flex-end"><Button variant="default" onClick={() => setSelected(null)}>Отмена</Button><Button leftSection={<IconCalendarEvent size={17} />} onClick={async () => { if (await requestMeeting(mentor, selected)) { setSelected(null); navigate('/student/meetings') } }}>Отправить заявку</Button></Group>
           </Stack>
