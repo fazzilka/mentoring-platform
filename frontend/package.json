@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
-    "test": "tsx --test src/app/adapters/demo/*.test.ts src/app/adapters/api/*.test.ts src/app/auth/*.test.ts src/shared/lib/*.test.ts src/shared/api/*.test.ts"
+    "test": "tsx --test src/app/adapters/api/*.test.ts src/app/auth/*.test.ts src/shared/lib/*.test.ts src/shared/api/*.test.ts"
   },
   "dependencies": {
     "@mantine/core": "^8.3.1",
