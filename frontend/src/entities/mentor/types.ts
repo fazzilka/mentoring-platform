@@ -16,6 +16,9 @@ export interface Mentor {
   company: string
   position: string
   timezone: string
+  email: string | null
+  telegramUsername: string | null
+  phoneNumber: string | null
   acceptingStudents: boolean
   status: typeof mentorStatuses[number]
   availableSlots: TimeSlot[]
