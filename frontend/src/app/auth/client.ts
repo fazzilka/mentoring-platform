@@ -6,6 +6,7 @@ const tokenSchema = z.object({ access_token: z.string(), expires_in: z.number().
 const userSchema = z.object({
   id: z.string().uuid(), name: z.string(), email: z.string(), roles: z.array(z.enum(appModes)).min(1),
   first_name: z.string(), last_name: z.string(), timezone: z.string(), avatar_url: z.string().nullable(),
+  telegram_username: z.string().nullable(), phone_number: z.string().nullable(),
 })
 export type AuthUser = z.infer<typeof userSchema>
 export interface AuthSnapshot {
@@ -89,6 +90,7 @@ export function createAuthClient() {
       const user = userSchema.parse(await authorizedRequest('/auth/me', { method: 'PUT', body: JSON.stringify({
         first_name: profile.firstName, last_name: profile.lastName, email: profile.email,
         timezone: profile.timezone, avatar_url: profile.avatarUrl || null,
+        telegram_username: profile.telegramUsername || null, phone_number: profile.phoneNumber || null,
       }) }))
       if (current === generation) publish({ status: 'authenticated', user, error: '' })
     },
