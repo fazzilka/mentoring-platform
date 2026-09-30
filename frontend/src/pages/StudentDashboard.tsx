@@ -53,7 +53,7 @@ export function StudentDashboard() {
             </div>
           </Surface>
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-            <Surface><Group justify="space-between"><Text size="sm" c="dimmed">Следующая встреча</Text><IconCalendarEvent size={18} /></Group><Title order={3} mt="md">{upcoming[0] ? `${upcoming[0].date}, ${upcoming[0].time}` : 'Пока не назначена'}</Title><Text size="sm" c="dimmed" mt={5}>{upcoming[0] ? `${upcoming[0].duration} минут · ${upcoming[0].status === 'pending' ? 'Ожидает подтверждения' : 'Телемост'}` : 'Выберите свободный слот наставника'}</Text></Surface>
+            <Surface><Group justify="space-between"><Text size="sm" c="dimmed">Следующая встреча</Text><IconCalendarEvent size={18} /></Group><Title order={3} mt="md">{upcoming[0] ? `${upcoming[0].date}, ${upcoming[0].time}` : 'Пока не назначена'}</Title><Text size="sm" c="dimmed" mt={5}>{upcoming[0] ? `${upcoming[0].duration} минут · ${upcoming[0].status === 'pending' ? 'Ожидает подтверждения' : 'Ссылка в карточке встречи'}` : 'Выберите свободный слот наставника'}</Text></Surface>
             <Surface><Group justify="space-between"><Text size="sm" c="dimmed">Последняя заметка</Text><IconNotes size={18} /></Group><Text size="sm" fw={600} mt="md" lineClamp={2}>{latestReflection?.summary ?? 'Заметок пока нет'}</Text><Button variant="subtle" size="xs" mt={8} px={0} onClick={() => navigate('/student/notes')}>Открыть заметки</Button></Surface>
           </SimpleGrid>
           <div><Group justify="space-between" mb="md"><Title order={2}>Ближайшие встречи</Title><Button variant="subtle" onClick={() => navigate('/student/meetings')}>Все встречи</Button></Group><MeetingList meetings={upcoming} compact /></div>
