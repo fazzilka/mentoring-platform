@@ -8,6 +8,8 @@ export interface ProfileDraft {
   firstName: string
   lastName: string
   email: string
+  telegramUsername: string
+  phoneNumber: string
   timezone: string
   studentAbout: string
   studentLevel: string
@@ -21,5 +23,5 @@ export interface ProfileDraft {
   mentorExperience: string
   mentorCompany: string
   mentorPosition: string
-  telemostUrl: string
+  meetingUrl: string
 }
