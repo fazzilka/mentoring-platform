@@ -18,9 +18,10 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
   const listeners = new Set<() => void>()
   const profile: ProfileDraft = {
     firstName: user.first_name, lastName: user.last_name, email: user.email, timezone: user.timezone,
+    telegramUsername: user.telegram_username ?? '', phoneNumber: user.phone_number ?? '',
     avatarUrl: user.avatar_url ?? '', studentAbout: '', studentLevel: '', studentDirection: '', studentGoal: '',
     studentTechnologies: '', studentLearning: '', mentorAbout: '', mentorSpecialization: 'Backend', mentorSkills: '',
-    mentorExperience: '', mentorCompany: '', mentorPosition: '', telemostUrl: '',
+    mentorExperience: '', mentorCompany: '', mentorPosition: '', meetingUrl: '',
   }
   const empty: Omit<PlatformData, 'mode'> = { profile, mentors: [], students: [], assignments: [], availability: [], meetings: [], reflections: [], notifications: [] }
   const request = auth.authorizedRequest
@@ -45,12 +46,13 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
     ])
     const mentorsById = new Map(catalog.map(item => [item.user_id, item]))
     if (mentorData) mentorsById.set(user.id, mentorData)
-    for (const item of assignments) if (!mentorsById.has(item.mentor_id)) mentorsById.set(item.mentor_id, await get(`/mentors/${item.mentor_id}`, dto.mentorProfile))
+    for (const item of assignments) if (!mentorsById.has(item.mentor_id) || item.status === 'active') mentorsById.set(item.mentor_id, await get(`/mentors/${item.mentor_id}`, dto.mentorProfile))
     const mentors = await Promise.all([...mentorsById.values()].map(async item => {
       const slots = await get(`/mentors/${item.user_id}/slots`, z.array(dto.slotContract))
       const mapped: Mentor = { id: item.user_id, name: item.name, initials: dto.initials(item.name), avatarColor: '#e7e4dc',
         about: item.about, specialization: item.specialization, skills: item.skills, experience: `${item.experience_years} лет опыта`,
         company: item.company, position: item.position, timezone: item.timezone, acceptingStudents: item.accepting_students,
+        email: item.email, telegramUsername: item.telegram_username, phoneNumber: item.phone_number,
         status: item.status === 'active' ? 'online' : 'away',
         availableSlots: slots.filter(slot => slot.state === 'free' && new Date(slot.starts_at) > new Date()).map(slot => ({ id: slot.id, startsAt: slot.starts_at,
           date: dto.dateLabel(slot.starts_at, account.timezone), dateLabel: dto.dateLabel(slot.starts_at, account.timezone), time: dto.timeLabel(slot.starts_at, account.timezone), duration: slot.duration_minutes })),
@@ -59,13 +61,15 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
     }))
     const students = await Promise.all(people.map(async person => {
       const item = await get(`/students/${person.id}`, dto.studentProfile)
-      return { id: person.id, name: person.name, initials: dto.initials(person.name), level: item.level, direction: item.direction, skills: item.technologies, goal: item.goal, about: item.about }
+      return { id: person.id, name: person.name, initials: dto.initials(person.name), level: item.level, direction: item.direction, skills: item.technologies, goal: item.goal, about: item.about,
+        email: item.email, telegramUsername: item.telegram_username, phoneNumber: item.phone_number }
     }))
     const ownSlots = mentor ? await get(`/mentors/${user.id}/slots`, z.array(dto.slotContract)) : []
     const notes = (await Promise.all(meetings.map(item => get(`/meetings/${item.id}/reflections`, z.array(dto.reflectionContract))))).flat()
     const resultProfile = { ...profile, firstName: account.first_name, lastName: account.last_name, email: account.email, timezone: account.timezone, avatarUrl: account.avatar_url ?? '',
+      telegramUsername: account.telegram_username ?? '', phoneNumber: account.phone_number ?? '',
       ...(studentData ? { studentAbout: studentData.about, studentLevel: studentData.level, studentDirection: studentData.direction, studentGoal: studentData.goal, studentTechnologies: studentData.technologies.join(', '), studentLearning: studentData.learning_interests } : {}),
-      ...(mentorData ? { mentorAbout: mentorData.about, mentorSpecialization: mentorData.specialization, mentorSkills: mentorData.skills.join(', '), mentorExperience: String(mentorData.experience_years), mentorCompany: mentorData.company, mentorPosition: mentorData.position, telemostUrl: mentorData.default_meeting_url ?? '' } : {}),
+      ...(mentorData ? { mentorAbout: mentorData.about, mentorSpecialization: mentorData.specialization, mentorSkills: mentorData.skills.join(', '), mentorExperience: String(mentorData.experience_years), mentorCompany: mentorData.company, mentorPosition: mentorData.position, meetingUrl: mentorData.default_meeting_url ?? '' } : {}),
     }
     return { profile: resultProfile, mentors, students,
       assignments: assignments.map(item => ({ id: item.id, mentorId: item.mentor_id, status: item.status, startDate: dto.dateLabel(item.started_at, account.timezone), endDate: item.ended_at ? dto.dateLabel(item.ended_at, account.timezone) : undefined, endReason: item.end_reason === 'mentor_departed' ? 'mentor_departed' : undefined })),
@@ -101,8 +105,9 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
       selectMentor: mentor => mutation(() => write('/assignments', { mentor_id: mentor.id }), 'Наставник выбран'),
       departMentor: () => mutation(() => write('/profiles/mentor/depart'), 'Работа наставником завершена'),
       requestMeeting: (_mentor, slot) => mutation(() => write('/meetings', { availability_slot_id: slot.id }), 'Заявка отправлена'),
+      createMentorMeeting: (studentId, slotId, meetingUrl) => mutation(() => write('/meetings/mentor', { student_id: studentId, availability_slot_id: slotId, meeting_url: meetingUrl }), 'Встреча назначена'),
       cancelMeeting: id => mutation(() => write(`/meetings/${id}/cancel`), 'Встреча отменена'),
-      updateMeetingStatus: (id, status) => mutation(() => write(`/meetings/${id}/${status === 'confirmed' ? 'confirm' : status === 'completed' ? 'complete' : 'reject'}`), 'Статус встречи изменён'),
+      updateMeetingStatus: (id, status, meetingUrl) => mutation(() => write(`/meetings/${id}/${status === 'confirmed' ? 'confirm' : status === 'completed' ? 'complete' : 'reject'}`, status === 'confirmed' ? { meeting_url: meetingUrl || null } : undefined), 'Статус встречи изменён'),
       addAvailability: input => mutation(() => {
         const timeZone = auth.getSnapshot().user?.timezone ?? user.timezone
         const value = parseForm(createAvailabilitySchema(timeZone), input)
@@ -119,7 +124,7 @@ export function createApiGateway(client: QueryClient, auth: ReturnType<typeof cr
         if (user.roles.includes('student')) await write('/profiles/student/me', { about: value.studentAbout, level: value.studentLevel, direction: value.studentDirection, goal: value.studentGoal, technologies: value.studentTechnologies.split(',').map(item => item.trim()).filter(Boolean), learning_interests: value.studentLearning }, 'PUT')
         if (user.roles.includes('mentor')) {
           const current = await get('/profiles/mentor/me', dto.mentorProfile)
-          if (current.status !== 'departed') await write('/profiles/mentor/me', { about: value.mentorAbout, specialization: value.mentorSpecialization, skills: value.mentorSkills.split(',').map(item => item.trim()).filter(Boolean), experience_years: Number(value.mentorExperience || 0), company: value.mentorCompany, position: value.mentorPosition, default_meeting_url: value.telemostUrl || null, accepting_students: current.accepting_students, status: current.status }, 'PUT')
+          if (current.status !== 'departed') await write('/profiles/mentor/me', { about: value.mentorAbout, specialization: value.mentorSpecialization, skills: value.mentorSkills.split(',').map(item => item.trim()).filter(Boolean), experience_years: Number(value.mentorExperience || 0), company: value.mentorCompany, position: value.mentorPosition, default_meeting_url: value.meetingUrl || null, accepting_students: current.accepting_students, status: current.status }, 'PUT')
         }
       }, 'Профиль сохранён'),
       markAllNotificationsRead: () => mutation(() => write('/notifications/read-all'), 'Уведомления прочитаны'),
