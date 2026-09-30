@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from pwdlib import PasswordHash
 
-from src.core.config import get_settings
+from src.config.config import get_settings
 
 password_hash = PasswordHash.recommended()
 
